@@ -1,1 +1,194 @@
-test.html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue 2 + Bootstrap 4 애니메이션 샘플 (완성형)</title>
+
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@2.23.1/dist/bootstrap-vue.min.css" />
+
+  <script src="https://unpkg.com/vue@2.6.14/dist/vue.min.js"></script>
+  <script src="https://unpkg.com/bootstrap-vue@2.23.1/dist/bootstrap-vue.min.js"></script>
+
+  <style>
+    .sample-content-area {
+      min-height: calc(100vh - calc(calc(2rem * 1) + 4.45rem + 3.35rem + 1.3rem + 0rem + 3.75rem));
+      background-color: #f24a45;  
+      position: relative;           
+      width: 100%;                  
+      display: flex;                
+      flex-direction: column;       
+      overflow: visible;
+      /* 🎯 모바일 마진 변경 시 부드럽게 전환 */
+      transition: margin 0.5s ease-in-out, width 0.5s ease-in-out; 
+    }
+
+    @media (max-width: 575.98px) {
+      .sample-content-area {
+        margin-left: -1rem !important;       
+        margin-right: -1rem !important;      
+        width: calc(100% + 2rem) !important; 
+      }
+    }
+
+    .style-line-height {
+      line-height: 1.6;
+    }
+
+    /* =======================================================================
+     * [✨ 핵심: 부트스트랩 그리드 전용 스무스 레이아웃 애니메이션 CSS]
+     * ======================================================================= */
+    
+    /* 1. 왼쪽 안내 영역 기본 상태 (PC 모드 비율 고정) */
+    .animated-left-panel {
+      /* 🎯 flex 비율과 padding, opacity 등 모든 수치를 0.5초 동안 부드럽게 변화시킴 */
+      transition: flex 0.5s ease-in-out, max-width 0.5s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+      flex: 0 0 41.666667%; /* Bootstrap col-md-5 의 원래 css 값 주입 */
+      max-width: 41.666667%;
+      opacity: 1;
+      overflow: hidden; /* 수축 시 내부 글자가 깨져서 줄바꿈되는 것을 방지 */
+    }
+
+    /* 2. 오른쪽 폼 영역 기본 상태 */
+    .animated-right-panel {
+      /* 🎯 왼쪽 패널이 줄어들 때 오른쪽 패널이 남은 공간을 스무스하게 밀고 들어오도록 flex 속성 애니메이션 지정 */
+      transition: flex 0.5s ease-in-out, max-width 0.5s ease-in-out, padding 0.5s ease-in-out;
+      flex: 0 0 58.333333%; /* Bootstrap col-md-7 의 원래 css 값 주입 */
+      max-width: 58.333333%;
+    }
+
+    /* 3. 🎯 모바일/태블릿(768px 미만)일 때 왼쪽 패널 붕괴 애니메이션 */
+    .panel-collapsed {
+      flex: 0 0 0% !important;     /* 가로 공간을 0%로 스무스하게 수축 */
+      max-width: 0% !important;    /* 최대 폭도 0%로 제한 */
+      padding: 0 !important;       /* 안쪽 여백도 함께 0으로 줄여서 툭 끊기는 느낌 방지 */
+      opacity: 0 !important;       /* 서서히 투명해지도록 처리 */
+    }
+
+    /* 4. 🎯 모바일/태블릿(768px 미만)일 때 오른쪽 패널 확장 애니메이션 */
+    .panel-expanded {
+      flex: 0 0 100% !important;   /* 왼쪽 패널이 사라진 남은 자리를 100% 가득 채우도록 확장 */
+      max-width: 100% !important;
+    }
+
+    /* 5. 모바일 최적화 패딩 제어 */
+    @media (max-width: 575.98px) {
+      .animated-right-panel {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app">
+    <div class="sample-content-area">
+      <div ref="myContainerWrapper" class="container-fluid p-0">
+        
+        <!-- 실시간 너비 표시줄 -->
+        <div v-if="true" class="p-1 bg-info text-white font-weight-bold text-center">
+          <ul class="list-unstyled border rounded bg-white text-left p-2 m-0 text-dark" style="font-size: 0.85rem;">
+            <li>브라우저 창 너비: {{ windowWidth }} px</li>
+            <li>현재 활성 Breakpoint:
+              <span v-if="windowWidth < 576" class="badge badge-danger">xs (폰 세로)</span>
+              <span v-else-if="windowWidth < 768" class="badge badge-warning">sm (폰 가로)</span>
+              <span v-else-if="windowWidth < 992" class="badge badge-success">md (태블릿)</span>
+              <span v-else-if="windowWidth < 1200" class="badge badge-primary">lg (PC)</span>
+              <span v-else class="badge badge-info">xl+ (와이드)</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 🎯 레이아웃 정렬 그릇 복구 및 수평 배치 유지 -->
+        <div class="row justify-content-center m-0 flex-nowrap" style="overflow: hidden;">
+          
+          <!-- 왼쪽 영역: PC일 땐 정상 노출, 768px 미만일 땐 클래스 동적 바인딩으로 스무스하게 수축 -->
+          <div
+            class="d-flex flex-column justify-content-center animated-left-panel p-3"
+            :class="{'panel-collapsed': !isMdAndUp}"
+            style="background-color: #13e910;"
+          >
+            <!-- 🎯 고정 최소 가로폭(min-width)을 주어 수축 애니메이션 시 내부 글자가 찌그러지며 밑으로 깨져 내려가는 현상 차단 -->
+            <div class="text-dark mx-auto" style="width: 100%; min-width: 280px; max-width: 340px;"> 
+              <h2 class="font-weight-bold mb-3">환영합니다! 👋</h2>
+              <p class="text-muted style-line-height">
+                하나의 계정으로 서비스의 모든 기능을 제한 없이 이용하실 수 있습니다.
+              </p>
+              <ul class="list-unstyled text-muted mt-4">
+                <li class="mb-2">✔️ 실시간 데이터 동기화</li>
+                <li class="mb-2">✔️ 반응형 레이아웃 템플릿 제공</li>
+                <li class="mb-2">✔️ 철저한 보안 및 개인정보 암호화</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 오른쪽 영역: PC일 땐 자기 크기 유지, 768px 미만일 땐 100% 꽉 차도록 스무스하게 확장 -->
+          <div
+            class="animated-right-panel d-flex flex-column justify-content-center"
+            :class="{'panel-expanded': !isMdAndUp}"
+            style="background-color: #f5f16f;"
+          >
+            <b-card class="shadow-sm border-0 signup-card m-3 mx-auto" style="width: 100%; max-width: 450px;">
+              <h3 class="text-center font-weight-bold mb-4">회원가입</h3>
+              <b-form @submit.prevent="handleSubmit">
+                <b-form-group label="이메일 주소" label-for="email">
+                  <b-form-input id="email" v-model="form.email" type="email" placeholder="example@email.com" required />
+                </b-form-group>
+                <b-form-group label="비밀번호" label-for="password">
+                  <b-form-input id="password" v-model="form.password" type="password" placeholder="8자 이상 입력하세요" required />
+                </b-form-group>
+                <b-form-group label="이름" label-for="name">
+                  <b-form-input id="name" v-model="form.name" type="text" placeholder="홍길동" required />
+                </b-form-group>
+                <b-form-group class="mt-4">
+                  <b-form-checkbox v-model="form.agreeTerms" required>이용약관 및 개인정보 처리방침 동의 (필수)</b-form-checkbox>
+                </b-form-group>
+                <b-button type="submit" variant="primary" block class="py-2 mt-4 font-weight-bold">계정 생성하기</b-button>
+              </b-form>
+              <div class="text-center mt-4">
+                <small class="text-muted">이미 계정이 있으신가요? <a href="#" class="text-primary">로그인하기</a></small>
+              </div>
+            </b-card>
+          </div>
+
+        </div> 
+      </div> 
+    </div> 
+  </div> 
+
+  <script>
+    Vue.use(BootstrapVue);
+
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          windowWidth: window.innerWidth,
+          form: { email: '', password: '', name: '', agreeTerms: false }
+        }
+      },
+      computed: {
+        isMdAndUp() {
+          return this.windowWidth >= 768
+        }
+      },
+      mounted() {
+        window.addEventListener('resize', this.handleResize)
+      },
+      beforeDestroy() {
+        window.removeEventListener('resize', this.handleResize)
+      },
+      methods: {
+        handleResize() {
+          this.windowWidth = window.innerWidth
+        },
+        handleSubmit() {
+          alert(`${this.form.name}님, 가입을 축하합니다!`)
+        }
+      }
+    });
+  </script>
+</body>
+</html>
