@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Vue 2 + Bootstrap 4 반응형 투두리스트</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+  <style>
+    body {
+      background-color: #f4f6f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding-top: 30px;
+      padding-bottom: 30px;
+    }
+    .todo-card {
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+    }
+    .todo-item {
+      transition: all 0.25s ease;
+      border-left: 5px solid #007bff; /* 기본: 진행중 파란색 선 */
+    }
+    .todo-item.completed {
+      border-left-color: #28a745; /* 완료: 녹색 선 */
+      background-color: #f8f9fa;
+    }
+    .todo-item.completed .todo-title {
+      text-decoration: line-through;
+      color: #6c757d;
+    }
+    .date-badge {
+      font-size: 0.75rem;
+      color: #6c757d;
+      display: block;
+    }
+    /* 모바일 터치 영역 및 줄바꿈 최적화 */
+    @media (max-width: 575.98px) {
+      .todo-actions {
+        width: 100%;
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app" class="container">
+    <div class="row mb-4">
+      <div class="col-12 text-center">
+        <h2 class="font-weight-bold text-dark">
+          <i class="fas fa-clipboard-list text-primary mr-2"></i>업무 & 정비 관리 Todo List
+        </h2>
+        <p class="text-muted">Vue 2와 Bootstrap 4 순정 클래스로 구현된 실시간 검색/반응형 시스템</p>
+      </div>
+    </div>
+
+    <div class="row">
+      
+      <div class="col-12 col-md-5 col-lg-4">
+        <div class="card todo-card p-3">
+          <h5 class="card-title font-weight-bold text-secondary mb-3">
+            <i class="fas fa-plus-circle mr-1"></i> 할 일 등록 / 수정
+          </h5>
+          
+          <form @submit.prevent="saveTodo">
+            <div class="form-group">
+              <label class="small font-weight-bold">제목 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" v-model.trim="form.title" placeholder="제목을 입력하세요" required>
+            </div>
+            
+            <div class="form-group">
+              <label class="small font-weight-bold">설명</label>
+              <textarea class="form-control" v-model="form.description" rows="3" placeholder="상세 설명을 적어주세요"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block shadow-sm">
+              <i :class="isEditMode ? 'fas fa-save mr-1' : 'fas fa-check mr-1'"></i>
+              {{ isEditMode ? '수정 완료' : '할 일 등록' }}
+            </button>
+            
+            <button type="button" class="btn btn-outline-secondary btn-block mt-2" v-if="isEditMode" @click="resetForm">
+              취소
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-7 col-lg-8">
+        
+        <div class="card todo-card p-3 mb-3">
+          <div class="row no-gutters align-items-center">
+            <div class="col-12 col-sm-8 mb-2 mb-sm-0 pr-sm-2">
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text bg-white border-right-0"><i class="fas fa-search text-muted"></i></span>
+                </div>
+                <input type="text" class="form-control border-left-0" v-model="searchQuery" placeholder="제목 또는 설명으로 검색...">
+              </div>
+            </div>
+            <div class="col-12 col-sm-4">
+              <select class="form-control" v-model="statusFilter">
+                <option value="all">전체 보기 ({{ todos.length }})</option>
+                <option value="active">진행중 ({{ activeCount }})</option>
+                <option value="completed">완료됨 ({{ completedCount }})</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="filteredTodos.length === 0" class="text-center py-5 bg-white rounded shadow-sm">
+          <i class="far fa-folder-open fa-3x text-muted mb-2"></i>
+          <p class="text-muted mb-0">일치하는 할 일 내역이 없습니다.</p>
+        </div>
+
+        <div v-else class="list-group">
+          <div 
+            v-for="todo in filteredTodos" 
+            :key="todo.id" 
+            class="list-group-item list-group-item-action todo-item flex-column align-items-start shadow-sm mb-2 rounded"
+            :class="{ 'completed': todo.isCompleted }"
+          >
+            <div class="d-flex w-100 justify-content-between align-items-start flex-wrap">
+              <div style="flex: 1; min-width: 250px;">
+                <h5 class="mb-1 font-weight-bold todo-title">{{ todo.title }}</h5>
+                <p class="mb-2 text-secondary small" style="white-space: pre-wrap;">{{ todo.description || '등록된 상세 설명이 없습니다.' }}</p>
+              </div>
+              
+              <div class="todo-actions">
+                <button class="btn btn-sm mr-1" :class="todo.isCompleted ? 'btn-outline-warning' : 'btn-success'" @click="toggleComplete(todo)">
+                  <i :class="todo.isCompleted ? 'fas fa-undo' : 'fas fa-check-badge'"></i> 
+                  {{ todo.isCompleted ? '진행 취소' : '완료' }}
+                </button>
+                <button class="btn btn-sm btn-outline-info mr-1" :disabled="todo.isCompleted" @click="editTodo(todo)">
+                  <i class="fas fa-edit"></i> 수정
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @click="deleteTodo(todo.id)">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="border-top pt-2 mt-2 row no-gutters">
+              <div class="col-6 col-sm-4">
+                <span class="date-badge"><i class="far fa-calendar-alt mr-1"></i>등록: {{ todo.createdAt }}</span>
+              </div>
+              <div class="col-6 col-sm-4" v-if="todo.updatedAt">
+                <span class="date-badge text-info"><i class="far fa-edit mr-1"></i>수정: {{ todo.updatedAt }}</span>
+              </div>
+              <div class="col-12 col-sm-4 mt-1 mt-sm-0" v-if="todo.isCompleted && todo.completedAt">
+                <span class="date-badge text-success font-weight-bold"><i class="far fa-check-circle mr-1"></i>완료: {{ todo.completedAt }}</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          // 샘플 기초 데이터 구성
+          todos: [
+            {
+              id: 1,
+              title: '포터 5톤 엔진오일 누유 점검',
+              description: '김천종합중기 요청 건. 하부 크랭크 케이스 가스켓 부분 미세 누유 흔적 마스터 사전 확인 필요.',
+              isCompleted: false,
+              createdAt: '2026-06-30 09:30',
+              updatedAt: null,
+              completedAt: null
+            },
+            {
+              id: 2,
+              title: '라디에이터 코어 세척 및 냉각수 보충',
+              description: '정기 유상 케어 필터 교체 작업 라인 주입 완료.',
+              isCompleted: true,
+              createdAt: '2026-06-29 14:15',
+              updatedAt: '2026-06-29 17:00',
+              completedAt: '2026-06-29 17:00'
+            }
+          ],
+          // 입력 폼 제어 객체
+          form: {
+            id: null,
+            title: '',
+            description: ''
+          },
+          isEditMode: false,
+          searchQuery: '',     // 검색 필터 키워드
+          statusFilter: 'all'  // 상태 필터링 기준 (all, active, completed)
+        }
+      },
+      computed: {
+        // 실시간 상태별 카운트 계산
+        activeCount() {
+          return this.todos.filter(t => !t.isCompleted).length;
+        },
+        completedCount() {
+          return this.todos.filter(t => t.isCompleted).length;
+        },
+        // 실시간 복합 검색 및 필터링 핵심 로직
+        filteredTodos() {
+          return this.todos.filter(todo => {
+            // 1. 상태 필터링 체크
+            const matchStatus = 
+              this.statusFilter === 'all' || 
+              (this.statusFilter === 'active' && !todo.isCompleted) || 
+              (this.statusFilter === 'completed' && todo.isCompleted);
+            
+            // 2. 검색어 매칭 체크 (제목 또는 설명 검색)
+            const query = this.searchQuery.toLowerCase();
+            const matchQuery = 
+              todo.title.toLowerCase().includes(query) || 
+              todo.description.toLowerCase().includes(query);
+            
+            return matchStatus && matchQuery;
+          }).sort((a, b) => b.id - a.id); // 최근 등록/수정순 상단 정렬
+        }
+      },
+      methods: {
+        // 날짜 포맷 함수 (YYYY-MM-DD HH:mm)
+        getNowDateTime() {
+          const now = new Date();
+          const padding = (num) => String(num).padStart(2, '0');
+          return `${now.getFullYear()}-${padding(now.getMonth() + 1)}-${padding(now.getDate())} ${padding(now.getHours())}:${padding(now.getMinutes())}`;
+        },
+        // 저장 및 수정 서브밋 처리
+        saveTodo() {
+          if (!this.form.title) return;
+
+          const nowTime = this.getNowDateTime();
+
+          if (this.isEditMode) {
+            // [수정 모드] 해당 객체 탐색 후 데이터 매핑 변경
+            const index = this.todos.findIndex(t => t.id === this.form.id);
+            if (index !== -1) {
+              this.todos[index].title = this.form.title;
+              this.todos[index].description = this.form.description;
+              this.todos[index].updatedAt = nowTime; // 수정일 주입
+            }
+          } else {
+            // [신규 등록 모드] 새로운 객체 빌드
+            const newTodo = {
+              id: Date.now(), // 고유 ID 대용
+              title: this.form.title,
+              description: this.form.description,
+              isCompleted: false,
+              createdAt: nowTime, // 등록일 필수 주입
+              updatedAt: null,
+              completedAt: null
+            };
+            this.todos.unshift(newTodo);
+          }
+          this.resetForm();
+        },
+        // 수정 모드로 변환 및 데이터 바인딩
+        editTodo(todo) {
+          this.isEditMode = true;
+          this.form.id = todo.id;
+          this.form.title = todo.title;
+          this.form.description = todo.description;
+        },
+        // 완료 여부 토글 스위치 스크립트
+        toggleComplete(todo) {
+          todo.isCompleted = !todo.isCompleted;
+          if (todo.isCompleted) {
+            todo.completedAt = this.getNowDateTime(); // 완료일 자동 각인
+          } else {
+            todo.completedAt = null;
+          }
+        },
+        // 할 일 삭제
+        deleteTodo(id) {
+          if (confirm('선택하신 할 일 항목을 삭제하시겠습니까?')) {
+            this.todos = this.todos.filter(t => t.id !== id);
+            // 만약 현재 수정중인 항목을 삭제한 경우 폼 리셋 방어코드
+            if (this.form.id === id) {
+              this.resetForm();
+            }
+          }
+        },
+        // 입력 칸 클리어 및 초기화
+        resetForm() {
+          this.form.id = null;
+          this.form.title = '';
+          this.form.description = '';
+          this.isEditMode = false;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
