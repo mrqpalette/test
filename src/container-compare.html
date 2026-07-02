@@ -6,32 +6,28 @@
     <title>Bootstrap Container 순수 속성 확인</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body class="py-5 bg-light">
+<body>
 
-    <div class="text-center mb-5">
-        <h1 class="fw-bold">Bootstrap Container 실제 속성 확인</h1>
-        <p class="text-secondary">커스텀 CSS 없이, 오직 Bootstrap 순수 클래스로만 시각화한 화면입니다.</p>
+    <div class="container">
+        <h2>1. 고정폭 컨테이너 (.container)</h2>
+        <p>
+            - 왜 최대폭이 1140px인가요?<br>
+            PC 화면 기준점(1200px)에서 좌우 안전 여백인 padding(총 30px)을 제외한 수치입니다. 12칸으로 나눴을 때 95px로 깔끔하게 떨어져 레이아웃 버그를 방지합니다.<br><br>
+            - 왜 화면을 줄일 때 뚝뚝 끊기나요?<br>
+            내부에 미디어 쿼리 브레이크포인트(576px, 768px, 992px, 1200px) 조건문이 걸려 있어, 창 크기가 해당 수치에 도달할 때마다 박스 크기가 계단식으로 툭툭 재조정됩니다.
+        </p>
     </div>
 
-    <div class="container bg-primary text-white p-4 mb-5">
-        <h2 class="fw-bold">1. .container (고정폭/반응형)</h2>
-        <p class="mt-3">현재 이 파란색 영역이 <strong>.container</strong>의 실제 크기입니다.</p>
-        <hr>
-        <ul>
-            <li><strong>width:</strong> 기본 100%로 시작하지만, 화면이 넓어지면 특정 크기(Breakpoint)에서 폭이 딱 고정됩니다.</li>
-            <li><strong>margin:</strong> 고정폭이 된 순간부터 남는 공간을 좌우로 똑같이 나눠 가져가므로 <strong>화면 중앙에 배치</strong>됩니다. (양옆의 회색 여백이 마진입니다.)</li>
-        </ul>
-    </div>
-
-
-    <div class="container-fluid bg-danger text-white p-4">
-        <h2 class="fw-bold">2. .container-fluid (전체폭)</h2>
-        <p class="mt-3">현재 이 빨간색 영역이 <strong>.container-fluid</strong>의 실제 크기입니다.</p>
-        <hr>
-        <ul>
-            <li><strong>width:</strong> 화면 크기와 상관없이 언제나 무조건 100% 전체를 차지합니다.</li>
-            <li><strong>margin:</strong> 좌우 여백이 남지 않기 때문에 화면 왼쪽 끝과 오른쪽 끝에 항상 밀착되어 있습니다.</li>
-        </ul>
+    <hr> <div class="container-fluid">
+        <h2>2. 전체폭 컨테이너 (.container-fluid)</h2>
+        <p>
+            - width: 100%<br>
+            최대 너비 제한(max-width)이 없기 때문에 모니터 해상도와 관계없이 언제나 화면을 좌우 끝까지 가득 채웁니다.<br><br>
+            - padding-left / right: 15px<br>
+            화면 전체를 쓰더라도 콘텐츠가 모니터 베젤 끝에 바짝 붙어 답답해 보이지 않도록 최소한의 좌우 안쪽 여백을 확보해 둔 것입니다.<br><br>
+            - margin-left / right: auto<br>
+            추후 개발자가 이 컨테이너에 강제로 max-width를 주었을 때 화면 한가운데에 정렬될 수 있도록 보호하는 안전장치입니다.
+        </p>
     </div>
 
 </body>
