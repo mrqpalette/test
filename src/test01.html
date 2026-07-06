@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Vue 2 Splitpanes (구분선 명확한 버전)</title>
+    
+    <!-- 1. Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- 2. Splitpanes 기본 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/splitpanes/dist/splitpanes.css" />
+    
+    <style>
+        /* 패널 전체 높이 */
+        .my-splitpanes { 
+            height: 500px; 
+            border: 1px solid #dee2e6; 
+        }
+        
+        /* 드래그 끊김 방지 최적화 */
+        .splitpanes__pane { 
+            transition: none !important; 
+        }
+        
+        /* ===================================================
+           ★ 핵심: 패널 경계선(Gutter/Splitter) 디자인 수정
+        =================================================== */
+        .splitpanes__splitter {
+            background-color: #ced4da !important; /* 명확한 회색 경계선 */
+            width: 8px !important;                 /* 선 두께를 도톰하게 조정 */
+            position: relative;
+            cursor: col-resize;
+            transition: background-color 0.2s !important;
+        }
+        
+        /* 경계선에 마우스를 올렸을 때 (Hover) */
+        .splitpanes__splitter:hover { 
+            background-color: #0d6efd !important; /* 부트스트랩 Primary 블루 색상 */
+        }
+
+        /* 경계선 내부에 세로 줄무늬 아이콘 추가 (드래그 핸들 느낌) */
+        .splitpanes__splitter::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 30px;
+            background-color: #6c757d;
+        }
+    </style>
+</head>
+<body class="p-5 bg-light">
+
+    <!-- Vue 2 앱 컨테이너 -->
+    <div id="app" class="card shadow">
+        <div class="card-header bg-dark text-white fw-bold">
+            시스템 관리 패널 (좌우 리사이징)
+        </div>
+        <div class="card-body p-0">
+            
+            <!-- default-theme 클래스를 함께 부여합니다 -->
+            <splitpanes class="my-splitpanes default-theme">
+                
+                <!-- 좌측 패널 (bg-light로 회색 음영 처리) -->
+                <pane size="30" min-size="15" class="p-3 bg-light border-end">
+                    <h5 class="text-secondary fw-bold">좌측 메뉴/트리</h5>
+                    <p class="text-muted small">여기는 회색 배경의 왼쪽 영역입니다.</p>
+                </pane>
+                
+                <!-- 우측 패널 (bg-white로 흰색 처리) -->
+                <pane class="p-3 bg-white">
+                    <h5 class="text-dark fw-bold font-monospace">우측 메인 콘텐츠</h5>
+                    <p class="small">여기는 흰색 배경의 오른쪽 영역입니다. 경계선에 마우스를 올려보세요!</p>
+                </pane>
+                
+            </splitpanes>
+
+        </div>
+    </div>
+
+    <!-- 3. Vue 2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <!-- 4. Splitpanes UMD CDN -->
+    <script src="https://unpkg.com/splitpanes/dist/splitpanes.umd.js"></script>
+
+    <script>
+        // Vue 2 전역 컴포넌트 등록
+        Vue.component('splitpanes', splitpanes.Splitpanes);
+        Vue.component('pane', splitpanes.Pane);
+
+        // Vue 2 인스턴스 생성
+        new Vue({
+            el: '#app'
+        });
+    </script>
+</body>
+</html>
