@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>고객 원장 종합 관리 (리스트형)</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f7f6; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h2 { color: #2c3e50; }
+    
+    /* 고객 카드 스타일 */
+    .customer-card { 
+      background: white; 
+      padding: 25px; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+      margin-bottom: 25px;
+      border-top: 4px solid #3b82f6;
+    }
+    .customer-header {
+      font-size: 18px;
+      font-weight: bold;
+      color: #1e293b;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed #e2e8f0;
+    }
+    
+    /* 폼 그리드 레이아웃 (4열로 배치하여 공간 최적화) */
+    .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-weight: bold; margin-bottom: 6px; color: #64748b; font-size: 13px; }
+    .form-group input { 
+      padding: 8px 10px; 
+      font-size: 14px; 
+      border: 1px solid #cbd5e1; 
+      border-radius: 6px; 
+      transition: all 0.2s;
+    }
+    .form-group input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    
+    /* 금액 입력창 우측 정렬 */
+    .align-right { text-align: right; font-weight: bold; color: #0f172a; }
+    
+    /* 하단 데이터 확인 영역 */
+    .data-preview { margin-top: 40px; padding: 20px; background: #1e293b; color: #a5b4fc; border-radius: 8px; overflow-x: auto; height: 400px; }
+    .data-preview h4 { color: #38bdf8; margin-top: 0; margin-bottom: 15px; }
+    .data-preview pre { margin: 0; font-size: 13px; line-height: 1.5; font-family: Consolas, monospace; }
+  </style>
+</head>
+<body>
+
+  <div id="app" class="container">
+    <h2>📋 고객 리스트 상세 관리 (총 {{ customerList.length }}명)</h2>
+    
+    <div v-for="(customer, index) in customerList" :key="index" class="customer-card">
+      <div class="customer-header">
+        👤 {{ customer.name }} 고객님 (ID: {{ customer.id }})
+      </div>
+      
+      <div class="form-grid">
+        <div class="form-group">
+          <label>휴대폰 번호</label>
+          <input type="text" :value="formatByPattern(customer.phone, customer.phone.length < 11 ? '###-###-####' : '###-####-####')" @input="updateField(customer, 'phone', $event, 'phone')" maxlength="13" placeholder="숫자만 입력">
+        </div>
+
+        <div class="form-group">
+          <label>이메일</label>
+          <input type="email" v-model="customer.email" placeholder="example@email.com">
+        </div>
+
+        <div class="form-group">
+          <label>주민등록번호</label>
+          <input type="text" :value="formatByPattern(customer.rrn, '######-#######')" @input="updateField(customer, 'rrn', $event, 'rrn')" maxlength="14" placeholder="13자리 숫자">
+        </div>
+
+        <div class="form-group">
+          <label>생년월일</label>
+          <input type="text" :value="formatByPattern(customer.birthdate, '####-##-##')" @input="updateField(customer, 'birthdate', $event, 'date')" maxlength="10" placeholder="YYYY-MM-DD">
+        </div>
+
+        <div class="form-group">
+          <label>가입일자</label>
+          <input type="text" :value="formatByPattern(customer.joinDate, '####-##-##')" @input="updateField(customer, 'joinDate', $event, 'date')" maxlength="10" placeholder="YYYY-MM-DD">
+        </div>
+
+        <div class="form-group">
+          <label>최근 입금일자</label>
+          <input type="text" :value="formatByPattern(customer.depositDate, '####-##-##')" @input="updateField(customer, 'depositDate', $event, 'date')" maxlength="10" placeholder="YYYY-MM-DD">
+        </div>
+
+        <div class="form-group">
+          <label>상품 가입금액 (원)</label>
+          <input type="text" class="align-right" :value="formatAmount(customer.joinAmount)" @input="updateField(customer, 'joinAmount', $event, 'amount')" placeholder="0">
+        </div>
+
+        <div class="form-group">
+          <label>현재 잔액 (원)</label>
+          <input type="text" class="align-right" :value="formatAmount(customer.amount)" @input="updateField(customer, 'amount', $event, 'amount')" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="data-preview">
+      <h4>📦 DB 전송용 Vue Data (순수 배열 데이터)</h4>
+      <pre>{{ JSON.stringify(customerList, null, 2) }}</pre>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        // DB에서 불러온 5명의 원천 데이터 (특수문자 없음)
+        customerList: [
+          {
+            id: 'CUST-001', name: '김철수',
+            phone: '01012345678', email: 'chulsoo.k@gmail.com', rrn: '8805151234567', birthdate: '19880515',
+            joinDate: '20251101', depositDate: '20260701', joinAmount: '50000000', amount: '1250000'
+          },
+          {
+            id: 'CUST-002', name: '이영희',
+            phone: '01098765432', email: 'younghee_lee@naver.com', rrn: '9211222345678', birthdate: '19921122',
+            joinDate: '20260115', depositDate: '20260705', joinAmount: '10000000', amount: '10000000'
+          },
+          {
+            id: 'CUST-003', name: '박민수',
+            phone: '0115557777', email: 'minsoo.p@daum.net', rrn: '7503011987654', birthdate: '19750301',
+            joinDate: '20240820', depositDate: '20260630', joinAmount: '100000000', amount: '85000000'
+          },
+          {
+            id: 'CUST-004', name: '정수진',
+            phone: '01022223333', email: 'sujin.jung@company.com', rrn: '9507182111222', birthdate: '19950718',
+            joinDate: '20260310', depositDate: '20260709', joinAmount: '3000000', amount: '250000'
+          },
+          {
+            id: 'CUST-005', name: '홍길동',
+            phone: '01044445555', email: 'gildong.hong@test.com', rrn: '8012251333444', birthdate: '19801225',
+            joinDate: '20260501', depositDate: '', joinAmount: '20000000', amount: '0'
+          }
+        ]
+      },
+      methods: {
+        // 1. 만능 문자열 포맷터
+        formatByPattern(value, pattern) {
+          if (!value) return '';
+          const numbers = value.toString().replace(/[^0-9]/g, '');
+          let result = '';
+          let numIdx = 0;
+          for (let i = 0; i < pattern.length; i++) {
+            if (numIdx >= numbers.length) break;
+            if (pattern[i] === '#') {
+              result += numbers[numIdx++];
+            } else {
+              result += pattern[i];
+            }
+          }
+          return result;
+        },
+
+        // 2. 금액 포맷터
+        formatAmount(value) {
+          if (!value) return '';
+          const numbers = value.toString().replace(/[^0-9]/g, '');
+          if (!numbers) return '';
+          return Number(numbers).toLocaleString('ko-KR');
+        },
+        
+        // 3. 리스트 데이터 업데이트 핸들러 (수정할 customer 객체를 첫 번째 인자로 받음)
+        updateField(customer, fieldName, event, type) {
+          const rawValue = event.target.value.replace(/[^0-9]/g, '');
+          
+          // Vue 2 반응성을 유지하며 해당 고객 객체의 데이터 업데이트
+          this.$set(customer, fieldName, rawValue);
+
+          let formattedValue = '';
+          if (type === 'amount') {
+            formattedValue = this.formatAmount(rawValue);
+          } else {
+            let pattern = '';
+            if (type === 'date') pattern = '####-##-##'; 
+            else if (type === 'rrn') pattern = '######-#######'; 
+            else if (type === 'phone') pattern = rawValue.length < 11 ? '###-###-####' : '###-####-####';
+            
+            formattedValue = this.formatByPattern(rawValue, pattern);
+          }
+
+          event.target.value = formattedValue;
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>
