@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue 2 & Bootstrap 4 - Excel with Memos</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+
+  <div id="app" class="container mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">직원 명부 엑셀 다운로드</h5>
+            <h6 class="card-subtitle mb-3 text-muted">셀 메모(Note) 추가 버전</h6>
+            
+            <div class="alert alert-info" role="alert">
+              <strong>업데이트:</strong> 다운로드한 엑셀 파일의 <strong>ID 헤더</strong>와 <strong>홍길동 사원의 부서 셀</strong>에 마우스를 올리면 추가된 메모를 확인할 수 있습니다.
+            </div>
+
+            <table class="table table-bordered text-center mt-3">
+              <thead class="thead-light">
+                <tr>
+                  <th>ID (수정불가)</th>
+                  <th>이름 (빈칸추가가능)</th>
+                  <th>부서 (빈칸추가가능)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="emp in employees" :key="emp.id">
+                  <td>{{ emp.id }}</td>
+                  <td>{{ emp.name }}</td>
+                  <td>{{ emp.department }}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="text-right">
+              <button class="btn btn-success" @click="downloadExcel">
+                엑셀 파일로 다운로드 (.xlsx)
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          employees: [
+            { id: 1, name: '홍길동', department: '개발팀' },
+            { id: 2, name: '김철수', department: '디자인팀' },
+            { id: 3, name: '이영희', department: '기획팀' },
+            { id: 4, name: '박민수', department: '영업팀' }
+          ]
+        }
+      },
+      methods: {
+        async downloadExcel() {
+          try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('직원 명부');
+
+            // 1. 헤더 세팅
+            worksheet.columns = [
+              { header: 'ID', key: 'id', width: 10 },
+              { header: '이름', key: 'name', width: 20 },
+              { header: '부서', key: 'department', width: 25 }
+            ];
+
+            // 2. 데이터 추가 및 특정 데이터 메모 삽입
+            this.employees.forEach(emp => {
+              // 행(Row)을 추가하면서 해당 행의 객체를 받아옵니다.
+              const row = worksheet.addRow(emp);
+              
+              // 예시: 특정 사원(홍길동)의 셀에만 메모를 추가하고 싶을 때
+              if (emp.name === '홍길동') {
+                // name 셀을 가져와서 note 속성 부여
+                row.getCell('name').note = '2023년 우수 사원입니다.';
+              }
+            });
+
+            // 3. 이름, 부서 열 전체 잠금 해제 (빈 행 허용)
+            worksheet.getColumn('name').protection = { locked: false };
+            worksheet.getColumn('department').protection = { locked: false };
+
+            // 4. 첫 번째 행(제목) 서식 적용 및 메모 추가 후 다시 잠금 처리
+            worksheet.getRow(1).eachCell((cell, colNumber) => {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+              cell.font = { bold: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+              cell.protection = { locked: true }; 
+              
+              // 예시: 첫 번째 열(ID 헤더)에 사용자 안내용 메모 추가
+              if (colNumber === 1) {
+                cell.note = 'ID 열은 시스템 고유 번호이므로\n임의로 수정하거나 삭제할 수 없습니다.';
+              }
+            });
+
+            // 5. 시트 보호 시 유연한 권한 허용 옵션 추가
+            await worksheet.protect('1234', {
+              selectLockedCells: true,
+              selectUnlockedCells: true,
+              insertRows: true,
+              deleteRows: true,
+              sort: true,
+              autoFilter: true,
+              formatCells: true,
+              formatRows: true,
+              formatColumns: true
+            });
+
+            // 6. 파일 생성 및 다운로드
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { 
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            
+            saveAs(blob, '직원명부_메모추가.xlsx');
+
+          } catch (error) {
+            console.error('엑셀 생성 중 오류 발생:', error);
+            alert('엑셀 다운로드에 실패했습니다.');
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
