@@ -3,29 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vue 2 & Bootstrap 4 - Excel Dropdown (Unique List)</title>
+  <title>Vue 2 & Bootstrap 4 - Excel Master Template</title>
+  
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
 </head>
 <body>
 
   <div id="app" class="container mt-5">
     <div class="row justify-content-center">
-      <div class="col-md-8">
+      <div class="col-md-9">
         
         <div class="card shadow-sm">
           <div class="card-body">
-            <h5 class="card-title">직원 명부 엑셀 다운로드</h5>
-            <h6 class="card-subtitle mb-3 text-muted">드롭다운 중복 제거 완벽 적용</h6>
+            <h5 class="card-title">직원 명부 엑셀 다운로드 (마스터 템플릿)</h5>
+            <h6 class="card-subtitle mb-3 text-muted">모든 고급 기능(보호, 드롭다운, 중복방지, 메모) 통합 버전</h6>
             
-            <div class="alert alert-info" role="alert">
-              <strong>업데이트:</strong> 원본 데이터에 중복된 부서명이 섞여 있더라도, 엑셀 드롭다운 목록에는 <strong>중복이 완벽하게 제거된 고유한 부서명</strong>만 깔끔하게 노출됩니다.
+            <div class="alert alert-success" role="alert">
+              <ul class="mb-0 pl-3">
+                <li><strong>ID 및 제목:</strong> 수정 불가 (메모 포함)</li>
+                <li><strong>이름 열:</strong> 수정 및 빈칸 추가 가능 / <strong>동일한 이름 중복 입력 차단</strong></li>
+                <li><strong>부서 열:</strong> 수정 및 빈칸 추가 가능 / <strong>중복이 제거된 드롭다운 목록 제공</strong></li>
+                <li><strong>시트 제어:</strong> 행 삽입/삭제, 정렬, 열 너비 조절 모두 가능</li>
+              </ul>
             </div>
 
-            <table class="table table-bordered text-center mt-3">
+            <table class="table table-bordered text-center mt-4">
               <thead class="thead-light">
                 <tr>
                   <th>ID (수정불가)</th>
-                  <th>이름 (텍스트입력)</th>
+                  <th>이름 (중복불가)</th>
                   <th>부서 (목록선택)</th>
                 </tr>
               </thead>
@@ -54,7 +60,9 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
+  
   <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -63,9 +71,10 @@
       el: '#app',
       data() {
         return {
-          // 의도적으로 중복된 데이터가 포함된 원본 배열
+          // 중복된 데이터가 포함된 원본 부서 목록
           departmentList: ['개발팀', '디자인팀', '기획팀', '개발팀', '영업팀', '기획팀', '마케팅팀'],
           
+          // 직원 초기 데이터
           employees: [
             { id: 1, name: '홍길동', department: '개발팀' },
             { id: 2, name: '김철수', department: '디자인팀' },
@@ -80,26 +89,19 @@
             const workbook = new ExcelJS.Workbook();
             
             // ==========================================
-            // [핵심] 1. Set을 이용한 중복 제거 및 배열 변환
-            // Set 객체는 중복을 허용하지 않는 특성이 있어, 이를 활용하면 쉽게 중복을 걸러낼 수 있습니다.
+            // [기능 1] 드롭다운을 위한 숨김 시트 생성 및 중복 제거
             // ==========================================
-            const uniqueDepartments = [...new Set(this.departmentList)];
-            
-            /* [참고] 만약 부서 목록 배열이 따로 없고, 직원 데이터에서 직접 부서 종류를 뽑아내고 싶다면 아래처럼 작성하셔도 됩니다.
-              const uniqueDepartments = [...new Set(this.employees.map(emp => emp.department))];
-            */
-            // ==========================================
-
-            // 2. 드롭다운 데이터를 담을 '숨김 시트' 생성
+            const uniqueDepartments = [...new Set(this.departmentList)]; // Set으로 중복 제거
             const listSheet = workbook.addWorksheet('데이터_목록');
             
-            // 중복이 제거된 고유 배열(uniqueDepartments)을 순회하며 숨김 시트에 기록
             uniqueDepartments.forEach(dept => {
               listSheet.addRow([dept]);
             });
-            listSheet.state = 'hidden'; 
+            listSheet.state = 'hidden'; // 사용자에게는 보이지 않게 숨김 처리
 
-            // 3. 메인 시트 생성 및 데이터 세팅
+            // ==========================================
+            // [기능 2] 메인 시트 세팅 및 초기 데이터 삽입
+            // ==========================================
             const worksheet = workbook.addWorksheet('직원 명부');
 
             worksheet.columns = [
@@ -109,55 +111,85 @@
             ];
 
             this.employees.forEach(emp => {
-              worksheet.addRow(emp);
+              const row = worksheet.addRow(emp);
+              // [기능 3] 특정 조건(홍길동)에 맞는 셀에 메모(Note) 추가
+              if (emp.name === '홍길동') {
+                row.getCell('name').note = '2023년 우수 사원입니다.';
+              }
             });
 
-            // 4. 권한 제어 (이름, 부서 전체 열어두고 1행만 잠금)
+            // ==========================================
+            // [기능 4] 셀 잠금 해제 및 헤더 설정 (ID 잠금 처리)
+            // ==========================================
+            // 이름과 부서 열 전체의 잠금을 풉니다. (빈 행 포함)
             worksheet.getColumn('name').protection = { locked: false };
             worksheet.getColumn('department').protection = { locked: false };
 
-            worksheet.getRow(1).eachCell((cell) => {
+            // 첫 번째 행(헤더)을 디자인하고 다시 굳게 잠급니다.
+            worksheet.getRow(1).eachCell((cell, colNumber) => {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
               cell.font = { bold: true };
               cell.alignment = { vertical: 'middle', horizontal: 'center' };
               cell.protection = { locked: true }; 
+              
+              // ID 헤더(1열)에 시스템 안내 메모 추가
+              if (colNumber === 1) {
+                cell.note = 'ID 열은 시스템 고유 번호이므로\n임의로 수정하거나 삭제할 수 없습니다.';
+              }
             });
 
-            // 5. 유효성 검사(드롭다운) 적용
-            // 데이터의 길이가 중복 제거 후 줄어들었으므로, 고유 배열의 길이를 사용합니다.
+            // ==========================================
+            // [기능 5] 데이터 유효성 검사 (드롭다운 & 중복입력 방지)
+            // 2행부터 1000행까지 넉넉하게 규칙을 적용합니다.
+            // ==========================================
             const listLength = uniqueDepartments.length; 
             
             for (let i = 2; i <= 1000; i++) {
+              // 1) 이름 열(B열): COUNTIF 수식을 이용한 중복 차단
+              worksheet.getCell(`B${i}`).dataValidation = {
+                type: 'custom',
+                allowBlank: true,
+                showErrorMessage: true,
+                errorTitle: '중복 입력 오류',
+                error: '이미 등록된 이름입니다. 중복되지 않는 다른 이름을 입력해 주세요.',
+                formulae: [`COUNTIF($B$2:$B$1000, B${i})<=1`] 
+              };
+
+              // 2) 부서 열(C열): 숨겨진 시트를 참조하는 드롭다운
               worksheet.getCell(`C${i}`).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: [`'데이터_목록'!$A$1:$A$${listLength}`],
                 showErrorMessage: true,
                 errorTitle: '잘못된 입력',
-                error: '지정된 부서 목록 중에서만 선택해 주세요.'
+                error: '지정된 부서 목록 중에서만 선택해 주세요.',
+                formulae: [`'데이터_목록'!$A$1:$A$${listLength}`]
               };
             }
 
-            // 6. 시트 보호
+            // ==========================================
+            // [기능 6] 시트 전체 보호 (행 삽입 등 사용자 권한 부여)
+            // ==========================================
             await worksheet.protect('1234', {
               selectLockedCells: true,
               selectUnlockedCells: true,
-              insertRows: true,
-              deleteRows: true,
-              sort: true,
-              autoFilter: true,
-              formatCells: true,
+              insertRows: true,     // 새 행 삽입 허용 (데이터 추가용)
+              deleteRows: true,     // 행 삭제 허용
+              sort: true,           // 데이터 정렬 허용
+              autoFilter: true,     // 자동 필터 허용
+              formatCells: true,    // 셀 서식 변경 허용
               formatRows: true,
-              formatColumns: true
+              formatColumns: true   // 열 너비 조절 허용
             });
 
-            // 7. 다운로드 실행
+            // ==========================================
+            // [기능 7] 파일 생성 및 다운로드 (FileSaver)
+            // ==========================================
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { 
               type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
             });
             
-            saveAs(blob, '직원명부_중복제거_드롭다운.xlsx');
+            saveAs(blob, '직원명부_마스터템플릿.xlsx');
 
           } catch (error) {
             console.error('엑셀 생성 중 오류 발생:', error);
