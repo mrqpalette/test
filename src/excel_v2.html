@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vue 2 & Bootstrap 4 - Excel Download (Protected Cells)</title>
-
+  <title>Vue 2 & Bootstrap 4 - Excel Column Unlock</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
 </head>
 <body>
@@ -16,18 +15,18 @@
         <div class="card shadow-sm">
           <div class="card-body">
             <h5 class="card-title">직원 명부 엑셀 다운로드</h5>
-            <h6 class="card-subtitle mb-3 text-muted">ID 열 및 헤더 읽기 전용 적용 버전</h6>
+            <h6 class="card-subtitle mb-3 text-muted">무한 행 입력 허용 버전</h6>
             
             <div class="alert alert-info" role="alert">
-              다운로드한 엑셀 파일은 <strong>ID 열과 최상단 헤더가 보호</strong>되어 수정할 수 없으며, <strong>이름과 부서 열만 수정</strong>이 가능합니다. (보호 해제 암호: 1234)
+              <strong>안내:</strong> ID 열과 제목(헤더)은 잠겨 수정할 수 없습니다. 대신 <strong>이름과 부서 열은 빈 행을 포함해 하단 전체가 열려 있어</strong> 새로운 직원을 계속 추가 입력할 수 있습니다.
             </div>
 
             <table class="table table-bordered text-center mt-3">
               <thead class="thead-light">
                 <tr>
-                  <th>ID</th>
-                  <th>이름</th>
-                  <th>부서</th>
+                  <th>ID (수정불가)</th>
+                  <th>이름 (빈칸추가가능)</th>
+                  <th>부서 (빈칸추가가능)</th>
                 </tr>
               </thead>
               <tbody>
@@ -55,9 +54,7 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
-  
   <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -66,7 +63,6 @@
       el: '#app',
       data() {
         return {
-          // 엑셀로 추출할 데이터
           employees: [
             { id: 1, name: '홍길동', department: '개발팀' },
             { id: 2, name: '김철수', department: '디자인팀' },
@@ -78,66 +74,55 @@
       methods: {
         async downloadExcel() {
           try {
-            // ExcelJS 워크북 및 시트 생성
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet('직원 명부');
 
-            // 1. 헤더 및 컬럼 너비 세팅
+            // 1. 헤더 세팅
             worksheet.columns = [
               { header: 'ID', key: 'id', width: 10 },
               { header: '이름', key: 'name', width: 20 },
               { header: '부서', key: 'department', width: 25 }
             ];
 
-            // 2. 헤더 스타일링 (배경색, 굵은 글씨, 가운데 정렬)
-            worksheet.getRow(1).eachCell((cell) => {
-              cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFE0E0E0' }
-              };
-              cell.font = { bold: true };
-              cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            });
-
-            // 3. 데이터 추가 (Vue의 data 활용)
+            // 2. 데이터 추가
             this.employees.forEach(emp => {
               worksheet.addRow(emp);
             });
 
             // ==========================================
-            // [셀 보호 및 잠금 해제 로직]
+            // [핵심 1] 이름, 부서 열 '전체'를 잠금 해제 (빈 행까지 적용됨)
             // ==========================================
-            
-            // A. 워크시트 전체 보호 (암호: 1234)
-            // 선택은 가능하게 하되, 기본적으로 모든 셀을 잠금 처리합니다.
+            worksheet.getColumn('name').protection = { locked: false };
+            worksheet.getColumn('department').protection = { locked: false };
+
+            // ==========================================
+            // [핵심 2] 열 전체를 풀었으므로, 첫 번째 줄(제목)은 다시 잠가줍니다.
+            // ==========================================
+            worksheet.getRow(1).eachCell((cell) => {
+              // 스타일링 동시 적용
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+              cell.font = { bold: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+              
+              // 1행은 무조건 다시 잠금!
+              cell.protection = { locked: true };
+            });
+
+            // ==========================================
+            // [핵심 3] 모든 설정 완료 후 시트 보호 실행
+            // ==========================================
             await worksheet.protect('1234', {
               selectLockedCells: true,
               selectUnlockedCells: true,
             });
 
-            // B. 수정이 가능한 컬럼(이름, 부서)의 잠금 해제
-            // rowNumber > 1 조건을 통해 첫 번째 줄(헤더)은 잠금 상태를 유지합니다.
-            worksheet.getColumn('name').eachCell((cell, rowNumber) => {
-              if (rowNumber > 1) {
-                cell.protection = { locked: false };
-              }
-            });
-
-            worksheet.getColumn('department').eachCell((cell, rowNumber) => {
-              if (rowNumber > 1) {
-                cell.protection = { locked: false };
-              }
-            });
-            // ==========================================
-
-            // 4. 파일 변환 및 다운로드 실행
+            // 3. 파일 생성 및 다운로드
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { 
               type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
             });
             
-            saveAs(blob, '직원명부_수정제한.xlsx');
+            saveAs(blob, '직원명부_행추가가능.xlsx');
 
           } catch (error) {
             console.error('엑셀 생성 중 오류 발생:', error);
