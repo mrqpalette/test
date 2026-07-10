@@ -19,11 +19,10 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 상세 정보가 여기에 표시됩니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 해당 노드와 직속 관계가 강조됩니다.</div>
     </div>
 
     <script>
-        // 1. [데이터] 엑셀 데이터를 여기에 복사하세요.
         const rawData = [
             { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '웹 서버 로그를 수집함.' },
             { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '메인 DB 덤프 작업.' },
@@ -33,12 +32,10 @@
             { id: 'F', label: '최종 적재', prev: ['D','E'], next: null, info: '최종 적재 작업.' }
         ];
 
-        // 2. [로직] 데이터 변환
         function processData(data) {
             const nodes = [];
             const edges = [];
             const nodeIds = new Set();
-
             data.forEach(item => {
                 if (!nodeIds.has(item.id)) {
                     nodes.push({ data: { id: item.id, label: item.label, info: item.info } });
@@ -52,36 +49,35 @@
             return { nodes, edges };
         }
 
-        // 3. [시각화] 그래프 초기화
         cytoscape.use(cytoscapeDagre);
         const cy = cytoscape({
             container: document.getElementById('cy'),
             elements: processData(rawData),
             style: [
-                { selector: 'node', style: { 
-                    'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px',
-                    'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 
-                }},
-                // 선택된 노드 강조 스타일
-                { selector: 'node.selected', style: { 
-                    'border-width': '6px', 'border-color': '#e74c3c', 'background-color': '#2980b9' 
-                }},
-                { selector: 'edge', style: { 
-                    'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 
-                }}
+                { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
+                { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 } },
+                
+                // [핵심] 상태에 따른 스타일 정의
+                { selector: '.dimmed', style: { 'opacity': '0.1' } },
+                { selector: '.highlight', style: { 'opacity': '1', 'background-color': '#e74c3c', 'border-width': '4px', 'border-color': '#c0392b' } }
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
 
-        // 4. [이벤트] 클릭 시 정보창 업데이트 및 선택 표시
         cy.on('tap', 'node', function(evt){
             const node = evt.target;
             
-            // 선택 초기화 및 적용
-            cy.nodes().removeClass('selected');
-            node.addClass('selected');
+            // 1. 모든 요소 초기화
+            cy.elements().removeClass('highlight dimmed');
+            cy.elements().addClass('dimmed');
 
-            // 직속 부모/자식 탐색 (.incomers, .outgoers 사용)
+            // 2. 선택 노드와 직속 부모/자식 설정
+            const focus = node.union(node.incomers()).union(node.outgoers());
+            
+            // 3. 관계 요소들 강조 (dimmed 제거 후 highlight 적용)
+            focus.removeClass('dimmed').addClass('highlight');
+
+            // 4. 정보창 업데이트
             const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
             const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
             
@@ -91,6 +87,13 @@
                 <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
                 <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
             `;
+        });
+
+        // 배경 클릭 시 초기화
+        cy.on('tap', function(evt){
+            if(evt.target === cy){
+                cy.elements().removeClass('highlight dimmed');
+            }
         });
     </script>
 </body>
