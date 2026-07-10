@@ -1,83 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
+    <meta charset="UTF-8">
+    <title>ETL Pipeline Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+    
     <style>
-        body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        #cy { flex-grow: 1; border-bottom: 2px solid #ccc; }
-        #info-panel { height: 200px; padding: 20px; background: #f8f9fa; border-top: 2px solid #ddd; }
-        .node-info { font-size: 1.1em; line-height: 1.6; }
+        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #cy { flex-grow: 1; border-bottom: 3px solid #333; background: #fdfdfd; }
+        #info-panel { height: 250px; padding: 20px; background: #2c3e50; color: #ecf0f1; overflow-y: auto; }
+        .info-title { font-size: 1.2em; border-bottom: 1px solid #7f8c8d; padding-bottom: 5px; margin-bottom: 10px; }
+        .info-content { font-size: 1em; line-height: 1.6; }
     </style>
 </head>
 <body>
     <div id="cy"></div>
     <div id="info-panel">
-        <div id="details"><strong>작업을 클릭하면 상세 정보가 여기에 표시됩니다.</strong></div>
+        <div class="info-title" id="node-title">작업 상세 정보</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 상세 정보가 여기에 표시됩니다.</div>
     </div>
 
     <script>
-        // 1. 원천 데이터 (엑셀 데이터를 이 배열에 복사하세요)
+        // 1. [데이터 영역] 엑셀에서 추출한 데이터를 이 배열에 복사하세요!
         const rawData = [
-            { id: 'A', prev: null, next: 'D', info: '소스 데이터 A 적재' },
-            { id: 'B', prev: null, next: 'D', info: '소스 데이터 B 적재' },
-            { id: 'D', prev: 'A', next: 'F', info: 'A,B,C 데이터 조인' },
-            { id: 'F', prev: 'D', next: null, info: '최종 리포트 생성' }
-            // 100개 이상의 데이터를 여기에 추가하세요!
+            { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '웹 서버 로그를 수집하여 Raw 데이터를 생성함.' },
+            { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '메인 DB 테이블을 일 단위로 덤프함.' },
+            { id: 'C', label: '외부 API 연동', prev: null, next: 'D', info: '환율 정보를 외부 API에서 조회함.' },
+            { id: 'D', label: '데이터 조인', prev: ['A','B','C'], next: 'F', info: 'A, B, C 데이터를 조인하여 마트를 생성.' },
+            { id: 'E', label: '기준정보 참조', prev: null, next: 'F', info: '고객 마스터 기준 정보를 조회함.' },
+            { id: 'F', label: '최종 적재', prev: ['D','E'], next: null, info: '최종 대시보드용 테이블에 적재.' }
         ];
 
-        // 2. 데이터 변환 로직 (Raw -> Nodes & Edges)
+        // 2. [로직 영역] RawData를 Cytoscape 형식으로 변환
         function processData(data) {
             const nodes = [];
             const edges = [];
             const nodeIds = new Set();
 
             data.forEach(item => {
-                // 노드 추가 (중복 방지)
+                // 노드 추가
                 if (!nodeIds.has(item.id)) {
-                    nodes.push({ data: { id: item.id, info: item.info } });
+                    nodes.push({ data: { id: item.id, label: item.label, info: item.info } });
                     nodeIds.add(item.id);
                 }
-                // 선행 작업 엣지 추가
+                // 관계(Edge) 추가 (배열 형태의 prev 처리)
                 if (item.prev) {
-                    edges.push({ data: { source: item.prev, target: item.id } });
-                }
-                // 후행 작업 엣지 추가
-                if (item.next) {
-                    edges.push({ data: { source: item.id, target: item.next } });
+                    const prevs = Array.isArray(item.prev) ? item.prev : [item.prev];
+                    prevs.forEach(p => {
+                        edges.push({ data: { source: p, target: item.id } });
+                    });
                 }
             });
             return { nodes, edges };
         }
 
-        // 3. 그래프 초기화
-        const elements = processData(rawData);
+        // 3. [시각화 영역] 그래프 초기화 및 레이아웃 설정
         cytoscape.use(cytoscapeDagre);
         const cy = cytoscape({
             container: document.getElementById('cy'),
-            elements: elements,
+            elements: processData(rawData),
             style: [
-                { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#4a90e2', 'color': '#fff' } },
-                { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#999' } }
+                { selector: 'node', style: { 
+                    'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px',
+                    'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80
+                }},
+                { selector: 'edge', style: { 
+                    'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 
+                }}
             ],
-            layout: { name: 'dagre', rankDir: 'LR', rankSep: 100 }
+            layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
 
-        // 4. 클릭 이벤트 (하단 정보창 업데이트)
+        // 4. [인터랙션 영역] 클릭 시 하단 정보창 업데이트
         cy.on('tap', 'node', function(evt){
             const node = evt.target;
             const info = node.data('info');
             const pre = node.predecessors().nodes().map(n => n.id()).join(', ');
             const suc = node.successors().nodes().map(n => n.id()).join(', ');
             
-            document.getElementById('details').innerHTML = `
-                <div class="node-info">
-                    <strong>작업명:</strong> ${node.id()}<br>
-                    <strong>상세 설명:</strong> ${info}<br>
-                    <strong>선행 작업:</strong> ${pre || '없음'}<br>
-                    <strong>후행 작업:</strong> ${suc || '없음'}
-                </div>
+            document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
+            document.getElementById('node-desc').innerHTML = `
+                <p><strong>상세 설명:</strong> ${info}</p>
+                <p><strong>선행 작업 ID:</strong> ${pre || '없음'}</p>
+                <p><strong>후행 작업 ID:</strong> ${suc || '없음'}</p>
             `;
         });
     </script>
