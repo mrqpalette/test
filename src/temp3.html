@@ -1,33 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="cytoscape.min.js"></script>
-    <script src="dagre.min.js"></script>
-    <script src="cytoscape-dagre.js"></script>
+    <!-- CDN 방식: 별도 다운로드 없이 인터넷에서 라이브러리를 불러옵니다 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+    
     <style>
-        #cy { width: 100%; height: 900px; border: 1px solid #ccc; }
+        body { margin: 0; padding: 0; }
+        #cy { width: 100vw; height: 100vh; background-color: #f9f9f9; }
     </style>
 </head>
 <body>
     <div id="cy"></div>
     <script>
+        // Cytoscape DAGRE 플러그인 등록
+        cytoscape.use(cytoscapeDagre);
+
         var cy = cytoscape({
             container: document.getElementById('cy'),
+            // 데이터 부분 (여기에 100개 데이터를 넣습니다)
             elements: [
-                // 데이터는 여기에 JSON 형식으로 들어갑니다.
-                { data: { id: 'A' } }, { data: { id: 'B' } }, { data: { id: 'C' } },
-                { data: { id: 'D' } }, { data: { id: 'E' } }, { data: { id: 'F' } },
+                { data: { id: 'A' } }, { data: { id: 'B' } }, { data: { id: 'D' } },
                 { data: { source: 'A', target: 'D' } },
-                { data: { source: 'B', target: 'D' } },
-                { data: { source: 'C', target: 'D' } },
-                { data: { source: 'D', target: 'F' } },
-                { data: { source: 'E', target: 'F' } }
+                { data: { source: 'B', target: 'D' } }
+                // 100개 작업은 아래 '데이터 삽입 팁'을 참고하세요!
             ],
             style: [
-                { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#666' } },
-                { selector: 'edge', style: { 'width': 3, 'line-color': '#ccc', 'target-arrow-shape': 'triangle' } }
+                { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#0074D9', 'color': '#fff', 'text-valign': 'center' } },
+                { selector: 'edge', style: { 'width': 2, 'line-color': '#999', 'target-arrow-color': '#999', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
             ],
-            layout: { name: 'dagre' } // 자동 계층 레이아웃 적용
+            layout: { name: 'dagre', rankDir: 'LR' } // 왼쪽에서 오른쪽으로 흐르게 설정
         });
     </script>
 </body>
