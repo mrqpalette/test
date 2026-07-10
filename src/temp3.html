@@ -12,7 +12,7 @@
         #cy { flex-grow: 1; border-bottom: 3px solid #333; background: #fdfdfd; }
         #info-panel { height: 250px; padding: 20px; background: #2c3e50; color: #ecf0f1; overflow-y: auto; }
         .info-title { font-size: 1.2em; border-bottom: 1px solid #7f8c8d; padding-bottom: 5px; margin-bottom: 10px; }
-        .info-content { font-size: 1em; line-height: 1.6; }
+        .info-content { font-size: 1em; line-height: 1.8; }
     </style>
 </head>
 <body>
@@ -23,40 +23,36 @@
     </div>
 
     <script>
-        // 1. [데이터 영역] 엑셀에서 추출한 데이터를 이 배열에 복사하세요!
+        // 1. [데이터] 엑셀 데이터를 여기에 복사하세요.
         const rawData = [
-            { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '웹 서버 로그를 수집하여 Raw 데이터를 생성함.' },
-            { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '메인 DB 테이블을 일 단위로 덤프함.' },
-            { id: 'C', label: '외부 API 연동', prev: null, next: 'D', info: '환율 정보를 외부 API에서 조회함.' },
-            { id: 'D', label: '데이터 조인', prev: ['A','B','C'], next: 'F', info: 'A, B, C 데이터를 조인하여 마트를 생성.' },
-            { id: 'E', label: '기준정보 참조', prev: null, next: 'F', info: '고객 마스터 기준 정보를 조회함.' },
-            { id: 'F', label: '최종 적재', prev: ['D','E'], next: null, info: '최종 대시보드용 테이블에 적재.' }
+            { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '웹 서버 로그를 수집함.' },
+            { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '메인 DB 덤프 작업.' },
+            { id: 'C', label: '외부 API 연동', prev: null, next: 'D', info: '환율 정보 연동.' },
+            { id: 'D', label: '데이터 조인', prev: ['A','B','C'], next: 'F', info: '조인하여 마트 생성.' },
+            { id: 'E', label: '기준정보 참조', prev: null, next: 'F', info: '고객 마스터 조회.' },
+            { id: 'F', label: '최종 적재', prev: ['D','E'], next: null, info: '최종 적재 작업.' }
         ];
 
-        // 2. [로직 영역] RawData를 Cytoscape 형식으로 변환
+        // 2. [로직] 데이터 변환
         function processData(data) {
             const nodes = [];
             const edges = [];
             const nodeIds = new Set();
 
             data.forEach(item => {
-                // 노드 추가
                 if (!nodeIds.has(item.id)) {
                     nodes.push({ data: { id: item.id, label: item.label, info: item.info } });
                     nodeIds.add(item.id);
                 }
-                // 관계(Edge) 추가 (배열 형태의 prev 처리)
                 if (item.prev) {
                     const prevs = Array.isArray(item.prev) ? item.prev : [item.prev];
-                    prevs.forEach(p => {
-                        edges.push({ data: { source: p, target: item.id } });
-                    });
+                    prevs.forEach(p => edges.push({ data: { source: p, target: item.id } }));
                 }
             });
             return { nodes, edges };
         }
 
-        // 3. [시각화 영역] 그래프 초기화 및 레이아웃 설정
+        // 3. [시각화] 그래프 초기화
         cytoscape.use(cytoscapeDagre);
         const cy = cytoscape({
             container: document.getElementById('cy'),
@@ -64,7 +60,11 @@
             style: [
                 { selector: 'node', style: { 
                     'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px',
-                    'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80
+                    'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 
+                }},
+                // 선택된 노드 강조 스타일
+                { selector: 'node.selected', style: { 
+                    'border-width': '6px', 'border-color': '#e74c3c', 'background-color': '#2980b9' 
                 }},
                 { selector: 'edge', style: { 
                     'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 
@@ -73,18 +73,23 @@
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
 
-        // 4. [인터랙션 영역] 클릭 시 하단 정보창 업데이트
+        // 4. [이벤트] 클릭 시 정보창 업데이트 및 선택 표시
         cy.on('tap', 'node', function(evt){
             const node = evt.target;
-            const info = node.data('info');
-            const pre = node.predecessors().nodes().map(n => n.id()).join(', ');
-            const suc = node.successors().nodes().map(n => n.id()).join(', ');
+            
+            // 선택 초기화 및 적용
+            cy.nodes().removeClass('selected');
+            node.addClass('selected');
+
+            // 직속 부모/자식 탐색 (.incomers, .outgoers 사용)
+            const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
+            const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
             
             document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
             document.getElementById('node-desc').innerHTML = `
-                <p><strong>상세 설명:</strong> ${info}</p>
-                <p><strong>선행 작업 ID:</strong> ${pre || '없음'}</p>
-                <p><strong>후행 작업 ID:</strong> ${suc || '없음'}</p>
+                <p><strong>상세 설명:</strong> ${node.data('info')}</p>
+                <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
+                <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
             `;
         });
     </script>
