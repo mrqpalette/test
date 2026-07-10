@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>ETL Pipeline Dashboard</title>
+    <title>ETL Pipeline Dashboard (Stress Test)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
@@ -11,26 +11,38 @@
         body { margin: 0; font-family: 'Malgun Gothic', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         #cy { flex-grow: 1; border-bottom: 3px solid #333; background: #fdfdfd; }
         #info-panel { height: 250px; padding: 20px; background: #2c3e50; color: #ecf0f1; overflow-y: auto; }
-        .info-title { font-size: 1.2em; border-bottom: 1px solid #7f8c8d; padding-bottom: 5px; margin-bottom: 10px; }
-        .info-content { font-size: 1em; line-height: 1.8; }
     </style>
 </head>
 <body>
     <div id="cy"></div>
     <div id="info-panel">
-        <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 관계가 표시됩니다.</div>
+        <div id="node-title" style="font-size: 1.2em; border-bottom: 1px solid #7f8c8d; margin-bottom:10px;">작업 상세 정보</div>
+        <div id="node-desc">노드를 클릭하면 여정과 관계가 표시됩니다.</div>
     </div>
 
     <script>
+        // [복잡한 구조의 예시 데이터] 
+        // 여러 소스(A~E) -> 중간 조인(F,G) -> 연산(H,I,J) -> 최종 적재(K,L)
         const rawData = [
-            { id: 'A', label: '로그 수집', prev: null, next: 'B', info: '웹 로그 수집 시작.' },
-            { id: 'B', label: '데이터 정제', prev: 'A', next: 'C', info: '필터링 작업.' },
-            { id: 'C', label: 'DB 덤프', prev: 'B', next: 'D', info: '메인 DB 덤프.' },
-            { id: 'D', label: '외부 API', prev: 'C', next: 'E', info: '환율 정보 연동.' },
-            { id: 'E', label: '데이터 조인', prev: 'D', next: 'F', info: '마트 데이터 생성.' },
-            { id: 'F', label: '기준정보 참조', prev: 'E', next: 'G', info: '고객 마스터 조회.' },
-            { id: 'G', label: '최종 적재', prev: 'F', next: null, info: '데이터 웨어하우스 적재.' }
+            // Layer 1: Ingestion
+            { id: 'A', label: '로그수집-Web', prev: null, next: 'F', info: '웹 서버 로그 수집' },
+            { id: 'B', label: '로그수집-App', prev: null, next: 'F', info: '앱 서버 로그 수집' },
+            { id: 'C', label: 'DB덤프-User', prev: null, next: 'G', info: '유저 정보 덤프' },
+            { id: 'D', label: 'DB덤프-Order', prev: null, next: 'G', info: '주문 정보 덤프' },
+            { id: 'E', label: '외부API-환율', prev: null, next: 'H', info: '환율 정보' },
+            
+            // Layer 2: Preprocessing
+            { id: 'F', label: '로그 정제', prev: ['A', 'B'], next: 'I', info: '로그 통합 및 정제' },
+            { id: 'G', label: '데이터 매핑', prev: ['C', 'D'], next: 'I', info: '데이터 코드 매핑' },
+            
+            // Layer 3: Main Logic
+            { id: 'H', label: '환율 계산', prev: 'E', next: 'I', info: '현지 통화 환산' },
+            { id: 'I', label: '메인 데이터 조인', prev: ['F', 'G', 'H'], next: ['J', 'K'], info: '전사 마트 조인' },
+            
+            // Layer 4: Aggregation & Final Load
+            { id: 'J', label: '일간 리포트', prev: 'I', next: 'L', info: '경영진 리포트' },
+            { id: 'K', label: '월간 통계', prev: 'I', next: 'L', info: '월간 마케팅 지표' },
+            { id: 'L', label: '데이터 웨어하우스', prev: ['J', 'K'], next: null, info: '최종 적재' }
         ];
 
         function processData(data) {
@@ -55,19 +67,13 @@
             style: [
                 { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#95a5a6', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
                 { selector: 'edge', style: { 'line-color': '#bdc3c7', 'width': 3, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle' } },
-                
-                // [상태 스타일]
                 { selector: '.dimmed', style: { 'opacity': '0.1' } },
                 { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
-                
-                // 노드 상태별 색상
-                { selector: '.predecessor', style: { 'background-color': '#27ae60' } }, // 초록
-                { selector: '.successor-direct', style: { 'background-color': '#d35400' } }, // 주황
-                { selector: '.successor-journey', style: { 'background-color': '#8e44ad' } }, // 보라
-                
-                // [선 스타일]
-                { selector: '.edge-predecessor', style: { 'line-style': 'dashed', 'line-color': '#1e8449', 'width': 4, 'target-arrow-color': '#1e8449' } },
-                { selector: '.edge-successor', style: { 'line-style': 'solid', 'line-color': '#d35400', 'width': 4, 'target-arrow-color': '#d35400' } }
+                { selector: '.predecessor', style: { 'background-color': '#27ae60' } }, 
+                { selector: '.successor-direct', style: { 'background-color': '#d35400' } }, 
+                { selector: '.successor-journey', style: { 'background-color': '#8e44ad' } },
+                { selector: '.edge-predecessor', style: { 'line-style': 'dashed', 'line-color': '#27ae60', 'width': 4 } },
+                { selector: '.edge-successor', style: { 'line-style': 'solid', 'line-color': '#d35400', 'width': 4 } }
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
@@ -75,44 +81,31 @@
         cy.on('tap', 'node', function(evt){
             const node = evt.target;
             const isAlreadySelected = node.hasClass('selected');
-
             cy.elements().removeClass('selected predecessor successor-direct successor-journey dimmed edge-predecessor edge-successor');
 
             if (!isAlreadySelected) {
                 cy.elements().addClass('dimmed');
-                
                 node.removeClass('dimmed').addClass('selected');
                 
-                // 1. 선행 (직속)
                 node.incomers().nodes().removeClass('dimmed').addClass('predecessor');
                 node.incomers().edges().removeClass('dimmed').addClass('edge-predecessor');
                 
-                // 2. 후행 (직속은 주황, 나머지 여정은 보라)
                 const directChildren = node.outgoers().nodes();
-                const journey = node.successors().nodes().not(directChildren);
-                
                 directChildren.removeClass('dimmed').addClass('successor-direct');
+                
+                const journey = node.successors().nodes().not(directChildren);
                 journey.removeClass('dimmed').addClass('successor-journey');
                 
-                // 후행 모든 엣지 강조
-                node.successors().edges().removeClass('dimmed').addClass('edge-successor');
+                node.outgoers().edges().removeClass('dimmed').addClass('edge-successor');
 
-                // 정보 업데이트
-                const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
-                const fullJourney = node.successors().nodes().map(n => n.data('label')).join(' → ');
-                
-                document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
+                document.getElementById('node-title').innerText = `작업명: ${node.data('label')}`;
                 document.getElementById('node-desc').innerHTML = `
-                    <p><strong>상세 설명:</strong> ${node.data('info')}</p>
-                    <p><strong>직속 선행:</strong> ${parents || '없음'}</p>
-                    <p><strong>후행 여정:</strong> ${fullJourney || '도착점'}</p>
+                    <p><strong>상세:</strong> ${node.data('info')}</p>
+                    <p><strong>선행(부모):</strong> ${node.incomers().nodes().map(n => n.data('label')).join(', ') || '없음'}</p>
+                    <p><strong>후행(여정):</strong> ${node.successors().nodes().map(n => n.data('label')).join(' → ') || '도착점'}</p>
                 `;
-            } else {
-                document.getElementById('node-title').innerText = `작업 상세 정보`;
-                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 여정과 관계가 표시됩니다.`;
             }
         });
-
         cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor successor-direct successor-journey dimmed edge-predecessor edge-successor'); });
     </script>
 </body>
