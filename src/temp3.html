@@ -19,7 +19,7 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 해당 노드와 직속 관계가 강조됩니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 상세 정보가 표시됩니다.</div>
     </div>
 
     <script>
@@ -33,9 +33,7 @@
         ];
 
         function processData(data) {
-            const nodes = [];
-            const edges = [];
-            const nodeIds = new Set();
+            const nodes = []; const edges = []; const nodeIds = new Set();
             data.forEach(item => {
                 if (!nodeIds.has(item.id)) {
                     nodes.push({ data: { id: item.id, label: item.label, info: item.info } });
@@ -54,47 +52,52 @@
             container: document.getElementById('cy'),
             elements: processData(rawData),
             style: [
-                { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
+                { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#e74c3c', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
                 { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 } },
                 
-                // [핵심] 상태에 따른 스타일 정의
-                { selector: '.dimmed', style: { 'opacity': '0.1' } },
-                { selector: '.highlight', style: { 'opacity': '1', 'background-color': '#e74c3c', 'border-width': '4px', 'border-color': '#c0392b' } }
+                // [구분 스타일 적용]
+                { selector: '.dimmed', style: { 'opacity': '0.2' } },
+                { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
+                { selector: '.predecessor', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } },
+                { selector: '.successor', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
 
         cy.on('tap', 'node', function(evt){
             const node = evt.target;
-            
+            const isAlreadySelected = node.hasClass('selected');
+
             // 1. 모든 요소 초기화
-            cy.elements().removeClass('highlight dimmed');
-            cy.elements().addClass('dimmed');
+            cy.elements().removeClass('selected predecessor successor dimmed');
 
-            // 2. 선택 노드와 직속 부모/자식 설정
-            const focus = node.union(node.incomers()).union(node.outgoers());
-            
-            // 3. 관계 요소들 강조 (dimmed 제거 후 highlight 적용)
-            focus.removeClass('dimmed').addClass('highlight');
+            if (!isAlreadySelected) {
+                // 2. 선택 시: 나머지 흐리게 처리
+                cy.elements().addClass('dimmed');
+                
+                // 3. 관계 설정
+                node.removeClass('dimmed').addClass('selected');
+                node.incomers().nodes().removeClass('dimmed').addClass('predecessor');
+                node.outgoers().nodes().removeClass('dimmed').addClass('successor');
 
-            // 4. 정보창 업데이트
-            const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
-            const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
-            
-            document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
-            document.getElementById('node-desc').innerHTML = `
-                <p><strong>상세 설명:</strong> ${node.data('info')}</p>
-                <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
-                <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
-            `;
+                // 4. 정보 업데이트
+                const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
+                const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
+                document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
+                document.getElementById('node-desc').innerHTML = `
+                    <p><strong>상세 설명:</strong> ${node.data('info')}</p>
+                    <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
+                    <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
+                `;
+            } else {
+                // 선택 해제 시 정보창 초기화
+                document.getElementById('node-title').innerText = `작업 상세 정보`;
+                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 상세 정보가 표시됩니다.`;
+            }
         });
 
         // 배경 클릭 시 초기화
-        cy.on('tap', function(evt){
-            if(evt.target === cy){
-                cy.elements().removeClass('highlight dimmed');
-            }
-        });
+        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor successor dimmed'); });
     </script>
 </body>
 </html>
