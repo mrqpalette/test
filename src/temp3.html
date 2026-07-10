@@ -19,18 +19,20 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 해당 노드의 전후 여정을 시각화합니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 관계가 표시됩니다.</div>
     </div>
 
     <script>
+        // 복잡한 ETL 흐름 예시 데이터 (여러 선행 작업이 모이고, 다시 갈라지는 구조)
         const rawData = [
-            { id: 'A', label: '로그 수집', prev: null, next: 'B', info: '웹 로그 수집 시작.' },
-            { id: 'B', label: '데이터 정제', prev: 'A', next: 'C', info: '필터링 작업.' },
-            { id: 'C', label: 'DB 덤프', prev: 'B', next: 'D', info: '메인 DB 덤프.' },
-            { id: 'D', label: '외부 API', prev: 'C', next: 'E', info: '환율 정보 연동.' },
-            { id: 'E', label: '데이터 조인', prev: 'D', next: 'F', info: '마트 데이터 생성.' },
-            { id: 'F', label: '기준정보 참조', prev: 'E', next: 'G', info: '고객 마스터 조회.' },
-            { id: 'G', label: '최종 적재', prev: 'F', next: null, info: '데이터 웨어하우스 적재.' }
+            { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '소스: 웹 로그' },
+            { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '소스: 메인 DB' },
+            { id: 'C', label: 'API 연동', prev: null, next: 'D', info: '소스: 외부 환율' },
+            { id: 'D', label: '데이터 조인', prev: ['A','B','C'], next: 'E', info: '3개 소스 조인' },
+            { id: 'E', label: '기준정보 매핑', prev: 'D', next: ['F','G'], info: '마스터 코드 매핑' },
+            { id: 'F', label: '리포트 생성', prev: 'E', next: 'H', info: '일간 리포트' },
+            { id: 'G', label: '백업 생성', prev: 'E', next: 'H', info: '로그 백업' },
+            { id: 'H', label: '최종 적재', prev: ['F','G'], next: null, info: 'DW 적재 완료' }
         ];
 
         function processData(data) {
@@ -53,16 +55,15 @@
             container: document.getElementById('cy'),
             elements: processData(rawData),
             style: [
-                { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#e74c3c', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
-                { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 } },
+                // [기본 상태] 회색 계열 (빨간색 탈피)
+                { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#95a5a6', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
+                { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#bdc3c7', 'width': 3 } },
                 
                 { selector: '.dimmed', style: { 'opacity': '0.1' } },
                 { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
-                
-                // 직속 선행 (데이터 정제)
-                { selector: '.direct-parent', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, 
-                // 후행 전체 여정 (외부 API ~ 최종 적재)
-                { selector: '.full-journey', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   
+                { selector: '.predecessor', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, // 직속 선행 (초록)
+                { selector: '.direct-child', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }, // 직속 후행 (주황)
+                { selector: '.full-journey', style: { 'background-color': '#8e44ad', 'border-width': '3px', 'border-color': '#5b2c6f' } }  // 전체 여정 (보라)
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
@@ -71,29 +72,27 @@
             const node = evt.target;
             const isAlreadySelected = node.hasClass('selected');
 
-            cy.elements().removeClass('selected direct-parent full-journey dimmed');
+            cy.elements().removeClass('selected predecessor direct-child full-journey dimmed');
 
             if (!isAlreadySelected) {
                 cy.elements().addClass('dimmed');
                 
-                // 선택된 노드 강조
                 node.removeClass('dimmed').addClass('selected');
-                
-                // 1. 선행은 직속 부모만 (Incomers)
-                node.incomers().nodes().removeClass('dimmed').addClass('direct-parent');
-                
-                // 2. 후행은 전체 여정 (Successors)
-                node.successors().nodes().removeClass('dimmed').addClass('full-journey');
+                // 선행(직속)
+                node.incomers().nodes().removeClass('dimmed').addClass('predecessor');
+                // 후행(직속)
+                node.outgoers().nodes().removeClass('dimmed').addClass('direct-child');
+                // 후행(직속 제외한 나머지 여정)
+                node.successors().nodes().not(node.outgoers().nodes()).removeClass('dimmed').addClass('full-journey');
 
-                // 상세 정보창 구성
                 const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
                 const journey = node.successors().nodes().map(n => n.data('label')).join(' → ');
                 
                 document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
                 document.getElementById('node-desc').innerHTML = `
                     <p><strong>상세 설명:</strong> ${node.data('info')}</p>
-                    <p><strong>직속 선행(부모):</strong> ${parents || '없음'}</p>
-                    <p><strong>후행 전체 여정:</strong> ${journey || '도착점'}</p>
+                    <p><strong>직속 선행:</strong> ${parents || '없음'}</p>
+                    <p><strong>후행 여정:</strong> ${journey || '도착점'}</p>
                 `;
             } else {
                 document.getElementById('node-title').innerText = `작업 상세 정보`;
@@ -101,7 +100,7 @@
             }
         });
 
-        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected direct-parent full-journey dimmed'); });
+        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor direct-child full-journey dimmed'); });
     </script>
 </body>
 </html>
