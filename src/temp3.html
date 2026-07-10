@@ -4,60 +4,81 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
-    
     <style>
-        #cy { width: 100%; height: 800px; background: #fafafa; border: 1px solid #ddd; }
-        #info-panel { height: 150px; background: #eee; padding: 15px; }
+        body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #cy { flex-grow: 1; border-bottom: 2px solid #ccc; }
+        #info-panel { height: 200px; padding: 20px; background: #f8f9fa; border-top: 2px solid #ddd; }
+        .node-info { font-size: 1.1em; line-height: 1.6; }
     </style>
 </head>
 <body>
     <div id="cy"></div>
     <div id="info-panel">
-        <div id="status">노드를 클릭하면 정보를 표시합니다.</div>
+        <div id="details"><strong>작업을 클릭하면 상세 정보가 여기에 표시됩니다.</strong></div>
     </div>
 
     <script>
-        cytoscape.use(cytoscapeDagre);
+        // 1. 원천 데이터 (엑셀 데이터를 이 배열에 복사하세요)
+        const rawData = [
+            { id: 'A', prev: null, next: 'D', info: '소스 데이터 A 적재' },
+            { id: 'B', prev: null, next: 'D', info: '소스 데이터 B 적재' },
+            { id: 'D', prev: 'A', next: 'F', info: 'A,B,C 데이터 조인' },
+            { id: 'F', prev: 'D', next: null, info: '최종 리포트 생성' }
+            // 100개 이상의 데이터를 여기에 추가하세요!
+        ];
 
-        var cy = cytoscape({
+        // 2. 데이터 변환 로직 (Raw -> Nodes & Edges)
+        function processData(data) {
+            const nodes = [];
+            const edges = [];
+            const nodeIds = new Set();
+
+            data.forEach(item => {
+                // 노드 추가 (중복 방지)
+                if (!nodeIds.has(item.id)) {
+                    nodes.push({ data: { id: item.id, info: item.info } });
+                    nodeIds.add(item.id);
+                }
+                // 선행 작업 엣지 추가
+                if (item.prev) {
+                    edges.push({ data: { source: item.prev, target: item.id } });
+                }
+                // 후행 작업 엣지 추가
+                if (item.next) {
+                    edges.push({ data: { source: item.id, target: item.next } });
+                }
+            });
+            return { nodes, edges };
+        }
+
+        // 3. 그래프 초기화
+        const elements = processData(rawData);
+        cytoscape.use(cytoscapeDagre);
+        const cy = cytoscape({
             container: document.getElementById('cy'),
-            elements: [
-                // Source Layer
-                { data: { id: 'A' } }, { data: { id: 'B' } }, { data: { id: 'C' } },
-                // Intermediate
-                { data: { id: 'D' } },
-                // Final
-                { data: { id: 'F' } },
-                // Edges (source -> target 방향을 확실히 지켜야 함)
-                { data: { source: 'A', target: 'D' } },
-                { data: { source: 'B', target: 'D' } },
-                { data: { source: 'C', target: 'D' } },
-                { data: { source: 'D', target: 'F' } }
-            ],
+            elements: elements,
             style: [
                 { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#4a90e2', 'color': '#fff' } },
-                { selector: 'edge', style: { 'width': 2, 'line-color': '#999', 'target-arrow-shape': 'triangle' } }
+                { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#999' } }
             ],
-            // 핵심: LR(Left to Right) 방향 강제
-            layout: { 
-                name: 'dagre',
-                rankDir: 'LR',
-                nodeSep: 50, // 노드 간 가로 간격
-                rankSep: 100 // 계층 간 세로 간격
-            }
+            layout: { name: 'dagre', rankDir: 'LR', rankSep: 100 }
         });
 
-        // 클릭 이벤트 (선/후행 정보)
+        // 4. 클릭 이벤트 (하단 정보창 업데이트)
         cy.on('tap', 'node', function(evt){
-            var node = evt.target;
-            // predecessors: 왼쪽(상위), successors: 오른쪽(하위)
-            var pre = node.predecessors().nodes().map(n => n.id()).join(', ');
-            var suc = node.successors().nodes().map(n => n.id()).join(', ');
+            const node = evt.target;
+            const info = node.data('info');
+            const pre = node.predecessors().nodes().map(n => n.id()).join(', ');
+            const suc = node.successors().nodes().map(n => n.id()).join(', ');
             
-            document.getElementById('status').innerHTML = 
-                `<strong>[${node.id()}]</strong><br>
-                 선행 작업(Upstream): ${pre || '없음'}<br>
-                 후행 작업(Downstream): ${suc || '없음'}`;
+            document.getElementById('details').innerHTML = `
+                <div class="node-info">
+                    <strong>작업명:</strong> ${node.id()}<br>
+                    <strong>상세 설명:</strong> ${info}<br>
+                    <strong>선행 작업:</strong> ${pre || '없음'}<br>
+                    <strong>후행 작업:</strong> ${suc || '없음'}
+                </div>
+            `;
         });
     </script>
 </body>
