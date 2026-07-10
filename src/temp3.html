@@ -1,36 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- CDN 방식: 별도 다운로드 없이 인터넷에서 라이브러리를 불러옵니다 -->
+    <title>ETL Pipeline Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
     
     <style>
-        body { margin: 0; padding: 0; }
-        #cy { width: 100vw; height: 100vh; background-color: #f9f9f9; }
+        body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
+        #cy { flex-grow: 1; border-bottom: 2px solid #ccc; background: #f0f0f0; }
+        #info-panel { height: 200px; padding: 20px; background: #fff; overflow-y: auto; }
+        .info-box { display: flex; gap: 40px; }
+        .info-title { font-weight: bold; color: #333; margin-bottom: 5px; }
+        .node-tag { display: inline-block; padding: 4px 8px; margin: 2px; background: #0074D9; color: white; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div id="cy"></div>
+    <div id="info-panel">
+        <h3 id="selected-node">노드를 선택하세요</h3>
+        <div class="info-box">
+            <div><div class="info-title">선행 작업 (Predecessors)</div><div id="pre-list"></div></div>
+            <div><div class="info-title">후행 작업 (Successors)</div><div id="suc-list"></div></div>
+        </div>
+    </div>
+
     <script>
-        // Cytoscape DAGRE 플러그인 등록
         cytoscape.use(cytoscapeDagre);
 
         var cy = cytoscape({
             container: document.getElementById('cy'),
-            // 데이터 부분 (여기에 100개 데이터를 넣습니다)
             elements: [
-                { data: { id: 'A' } }, { data: { id: 'B' } }, { data: { id: 'D' } },
-                { data: { source: 'A', target: 'D' } },
-                { data: { source: 'B', target: 'D' } }
-                // 100개 작업은 아래 '데이터 삽입 팁'을 참고하세요!
+                // 20개 노드 예시
+                { data: { id: 'A' } }, { data: { id: 'B' } }, { data: { id: 'C' } },
+                { data: { id: 'D' } }, { data: { id: 'E' } }, { data: { id: 'F' } },
+                { data: { id: 'G' } }, { data: { id: 'H' } }, { data: { id: 'I' } },
+                { data: { id: 'J' } }, { data: { id: 'K' } }, { data: { id: 'L' } },
+                { data: { id: 'M' } }, { data: { id: 'N' } }, { data: { id: 'O' } },
+                { data: { id: 'P' } }, { data: { id: 'Q' } }, { data: { id: 'R' } },
+                { data: { id: 'S' } }, { data: { id: 'T' } },
+                // 관계 설정 (엣지)
+                { data: { source: 'A', target: 'D' } }, { data: { source: 'B', target: 'D' } },
+                { data: { source: 'C', target: 'D' } }, { data: { source: 'D', target: 'F' } },
+                { data: { source: 'E', target: 'F' } }, { data: { source: 'G', target: 'H' } },
+                { data: { source: 'H', target: 'I' } }, { data: { source: 'I', target: 'J' } },
+                { data: { source: 'J', target: 'K' } }, { data: { source: 'K', target: 'L' } },
+                { data: { source: 'L', target: 'M' } }, { data: { source: 'M', target: 'N' } },
+                { data: { source: 'N', target: 'O' } }, { data: { source: 'O', target: 'P' } },
+                { data: { source: 'P', target: 'Q' } }, { data: { source: 'Q', target: 'R' } },
+                { data: { source: 'R', target: 'S' } }, { data: { source: 'S', target: 'T' } }
             ],
             style: [
-                { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#0074D9', 'color': '#fff', 'text-valign': 'center' } },
-                { selector: 'edge', style: { 'width': 2, 'line-color': '#999', 'target-arrow-color': '#999', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } }
+                { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#0074D9', 'color': '#fff' } },
+                { selector: 'edge', style: { 'width': 2, 'line-color': '#999', 'target-arrow-shape': 'triangle' } }
             ],
-            layout: { name: 'dagre', rankDir: 'LR' } // 왼쪽에서 오른쪽으로 흐르게 설정
+            layout: { name: 'dagre' }
+        });
+
+        // 클릭 이벤트 구현
+        cy.on('tap', 'node', function(evt){
+            var node = evt.target;
+            var nodeID = node.id();
+            
+            // 정보창 업데이트
+            document.getElementById('selected-node').innerText = "선택된 작업: " + nodeID;
+            
+            var preList = document.getElementById('pre-list');
+            var sucList = document.getElementById('suc-list');
+            preList.innerHTML = "";
+            sucList.innerHTML = "";
+
+            // 선행/후행 찾기 (Cytoscape 핵심 API)
+            node.predecessors().nodes().forEach(function(n){
+                preList.innerHTML += '<span class="node-tag">' + n.id() + '</span>';
+            });
+            node.successors().nodes().forEach(function(n){
+                sucList.innerHTML += '<span class="node-tag">' + n.id() + '</span>';
+            });
         });
     </script>
 </body>
