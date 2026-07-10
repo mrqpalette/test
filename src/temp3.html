@@ -19,7 +19,7 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 관계가 표시됩니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 해당 노드의 전후 여정을 시각화합니다.</div>
     </div>
 
     <script>
@@ -58,8 +58,11 @@
                 
                 { selector: '.dimmed', style: { 'opacity': '0.1' } },
                 { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
-                { selector: '.direct-parent', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, // 직속 부모 (초록)
-                { selector: '.full-journey', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   // 전체 여정 (주황)
+                
+                // 직속 선행 (데이터 정제)
+                { selector: '.direct-parent', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, 
+                // 후행 전체 여정 (외부 API ~ 최종 적재)
+                { selector: '.full-journey', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
@@ -73,16 +76,16 @@
             if (!isAlreadySelected) {
                 cy.elements().addClass('dimmed');
                 
-                // 1. 선택 노드
+                // 선택된 노드 강조
                 node.removeClass('dimmed').addClass('selected');
                 
-                // 2. 직속 부모 (Green)
+                // 1. 선행은 직속 부모만 (Incomers)
                 node.incomers().nodes().removeClass('dimmed').addClass('direct-parent');
                 
-                // 3. 전체 여정 (Orange) - successors()는 선택한 노드 다음부터 끝까지 모두 포함
+                // 2. 후행은 전체 여정 (Successors)
                 node.successors().nodes().removeClass('dimmed').addClass('full-journey');
 
-                // 정보 업데이트
+                // 상세 정보창 구성
                 const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
                 const journey = node.successors().nodes().map(n => n.data('label')).join(' → ');
                 
