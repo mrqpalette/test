@@ -19,11 +19,10 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 직속 관계가 표시됩니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 관계가 표시됩니다.</div>
     </div>
 
     <script>
-        // 1. [데이터] 긴 여정을 보여주기 위한 예시 데이터 추가
         const rawData = [
             { id: 'A', label: '로그 수집', prev: null, next: 'B', info: '웹 로그 수집 시작.' },
             { id: 'B', label: '데이터 정제', prev: 'A', next: 'C', info: '필터링 작업.' },
@@ -59,9 +58,8 @@
                 
                 { selector: '.dimmed', style: { 'opacity': '0.1' } },
                 { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
-                { selector: '.predecessor', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, // 직속 부모
-                { selector: '.ancestor', style: { 'background-color': '#9b59b6', 'border-width': '3px', 'border-color': '#8e44ad' } },     // 조상 노드
-                { selector: '.successor', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   // 직속 자식
+                { selector: '.direct-parent', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, // 직속 부모 (초록)
+                { selector: '.full-journey', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   // 전체 여정 (주황)
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
@@ -70,7 +68,7 @@
             const node = evt.target;
             const isAlreadySelected = node.hasClass('selected');
 
-            cy.elements().removeClass('selected predecessor ancestor successor dimmed');
+            cy.elements().removeClass('selected direct-parent full-journey dimmed');
 
             if (!isAlreadySelected) {
                 cy.elements().addClass('dimmed');
@@ -79,33 +77,28 @@
                 node.removeClass('dimmed').addClass('selected');
                 
                 // 2. 직속 부모 (Green)
-                node.incomers().nodes().removeClass('dimmed').addClass('predecessor');
+                node.incomers().nodes().removeClass('dimmed').addClass('direct-parent');
                 
-                // 3. 조상 노드 (부모 제외) - Purple
-                node.predecessors().nodes().not(node.incomers().nodes()).removeClass('dimmed').addClass('ancestor');
-                
-                // 4. 직속 자식 (Orange)
-                node.outgoers().nodes().removeClass('dimmed').addClass('successor');
+                // 3. 전체 여정 (Orange) - successors()는 선택한 노드 다음부터 끝까지 모두 포함
+                node.successors().nodes().removeClass('dimmed').addClass('full-journey');
 
-                // 정보창
+                // 정보 업데이트
                 const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
-                const ancestors = node.predecessors().nodes().not(node.incomers().nodes()).map(n => n.data('label')).join(', ');
-                const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
+                const journey = node.successors().nodes().map(n => n.data('label')).join(' → ');
                 
                 document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
                 document.getElementById('node-desc').innerHTML = `
                     <p><strong>상세 설명:</strong> ${node.data('info')}</p>
-                    <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
-                    <p><strong>조상 작업(Lineage):</strong> ${ancestors || '없음'}</p>
-                    <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
+                    <p><strong>직속 선행(부모):</strong> ${parents || '없음'}</p>
+                    <p><strong>후행 전체 여정:</strong> ${journey || '도착점'}</p>
                 `;
             } else {
                 document.getElementById('node-title').innerText = `작업 상세 정보`;
-                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 여정과 직속 관계가 표시됩니다.`;
+                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 여정과 관계가 표시됩니다.`;
             }
         });
 
-        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor ancestor successor dimmed'); });
+        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected direct-parent full-journey dimmed'); });
     </script>
 </body>
 </html>
