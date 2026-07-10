@@ -19,17 +19,19 @@
     <div id="cy"></div>
     <div id="info-panel">
         <div class="info-title" id="node-title">작업 상세 정보</div>
-        <div class="info-content" id="node-desc">노드를 클릭하면 상세 정보가 표시됩니다.</div>
+        <div class="info-content" id="node-desc">노드를 클릭하면 여정과 직속 관계가 표시됩니다.</div>
     </div>
 
     <script>
+        // 1. [데이터] 긴 여정을 보여주기 위한 예시 데이터 추가
         const rawData = [
-            { id: 'A', label: '로그 수집', prev: null, next: 'D', info: '웹 서버 로그를 수집함.' },
-            { id: 'B', label: 'DB 덤프', prev: null, next: 'D', info: '메인 DB 덤프 작업.' },
-            { id: 'C', label: '외부 API 연동', prev: null, next: 'D', info: '환율 정보 연동.' },
-            { id: 'D', label: '데이터 조인', prev: ['A','B','C'], next: 'F', info: '조인하여 마트 생성.' },
-            { id: 'E', label: '기준정보 참조', prev: null, next: 'F', info: '고객 마스터 조회.' },
-            { id: 'F', label: '최종 적재', prev: ['D','E'], next: null, info: '최종 적재 작업.' }
+            { id: 'A', label: '로그 수집', prev: null, next: 'B', info: '웹 로그 수집 시작.' },
+            { id: 'B', label: '데이터 정제', prev: 'A', next: 'C', info: '필터링 작업.' },
+            { id: 'C', label: 'DB 덤프', prev: 'B', next: 'D', info: '메인 DB 덤프.' },
+            { id: 'D', label: '외부 API', prev: 'C', next: 'E', info: '환율 정보 연동.' },
+            { id: 'E', label: '데이터 조인', prev: 'D', next: 'F', info: '마트 데이터 생성.' },
+            { id: 'F', label: '기준정보 참조', prev: 'E', next: 'G', info: '고객 마스터 조회.' },
+            { id: 'G', label: '최종 적재', prev: 'F', next: null, info: '데이터 웨어하우스 적재.' }
         ];
 
         function processData(data) {
@@ -55,11 +57,11 @@
                 { selector: 'node', style: { 'label': 'data(label)', 'text-wrap': 'wrap', 'text-max-width': '80px', 'background-color': '#e74c3c', 'color': '#fff', 'text-valign': 'center', 'width': 80, 'height': 80 } },
                 { selector: 'edge', style: { 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'line-color': '#95a5a6', 'width': 3 } },
                 
-                // [구분 스타일 적용]
-                { selector: '.dimmed', style: { 'opacity': '0.2' } },
+                { selector: '.dimmed', style: { 'opacity': '0.1' } },
                 { selector: '.selected', style: { 'background-color': '#3498db', 'border-width': '5px', 'border-color': '#2980b9' } },
-                { selector: '.predecessor', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } },
-                { selector: '.successor', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }
+                { selector: '.predecessor', style: { 'background-color': '#2ecc71', 'border-width': '3px', 'border-color': '#27ae60' } }, // 직속 부모
+                { selector: '.ancestor', style: { 'background-color': '#9b59b6', 'border-width': '3px', 'border-color': '#8e44ad' } },     // 조상 노드
+                { selector: '.successor', style: { 'background-color': '#f39c12', 'border-width': '3px', 'border-color': '#d35400' } }   // 직속 자식
             ],
             layout: { name: 'dagre', rankDir: 'LR', rankSep: 150, nodeSep: 50 }
         });
@@ -68,36 +70,42 @@
             const node = evt.target;
             const isAlreadySelected = node.hasClass('selected');
 
-            // 1. 모든 요소 초기화
-            cy.elements().removeClass('selected predecessor successor dimmed');
+            cy.elements().removeClass('selected predecessor ancestor successor dimmed');
 
             if (!isAlreadySelected) {
-                // 2. 선택 시: 나머지 흐리게 처리
                 cy.elements().addClass('dimmed');
                 
-                // 3. 관계 설정
+                // 1. 선택 노드
                 node.removeClass('dimmed').addClass('selected');
+                
+                // 2. 직속 부모 (Green)
                 node.incomers().nodes().removeClass('dimmed').addClass('predecessor');
+                
+                // 3. 조상 노드 (부모 제외) - Purple
+                node.predecessors().nodes().not(node.incomers().nodes()).removeClass('dimmed').addClass('ancestor');
+                
+                // 4. 직속 자식 (Orange)
                 node.outgoers().nodes().removeClass('dimmed').addClass('successor');
 
-                // 4. 정보 업데이트
+                // 정보창
                 const parents = node.incomers().nodes().map(n => n.data('label')).join(', ');
+                const ancestors = node.predecessors().nodes().not(node.incomers().nodes()).map(n => n.data('label')).join(', ');
                 const children = node.outgoers().nodes().map(n => n.data('label')).join(', ');
+                
                 document.getElementById('node-title').innerText = `작업명: ${node.data('label')} (${node.id()})`;
                 document.getElementById('node-desc').innerHTML = `
                     <p><strong>상세 설명:</strong> ${node.data('info')}</p>
                     <p><strong>직속 선행 작업:</strong> ${parents || '없음'}</p>
+                    <p><strong>조상 작업(Lineage):</strong> ${ancestors || '없음'}</p>
                     <p><strong>직속 후행 작업:</strong> ${children || '없음'}</p>
                 `;
             } else {
-                // 선택 해제 시 정보창 초기화
                 document.getElementById('node-title').innerText = `작업 상세 정보`;
-                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 상세 정보가 표시됩니다.`;
+                document.getElementById('node-desc').innerHTML = `노드를 클릭하면 여정과 직속 관계가 표시됩니다.`;
             }
         });
 
-        // 배경 클릭 시 초기화
-        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor successor dimmed'); });
+        cy.on('tap', function(evt){ if(evt.target === cy) cy.elements().removeClass('selected predecessor ancestor successor dimmed'); });
     </script>
 </body>
 </html>
