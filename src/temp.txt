@@ -1,392 +1,65 @@
-<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>지게차 정비 마스터 V10.5 (Grid Driven)</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-vue@2.21.1/dist/bootstrap-vue.min.css"
-    />
-    <style scoped>
-      /* 부트스트랩 클래스 내의 border-right 규칙 중 마지막 자식선만 깔끔하게 제거하기 위한 예외 규칙만 남겨둡니다 */
-      .border-right:last-child {
-        border-right: none !important;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="app">
-      <!-- 💡 부트스트랩 테두리 및 최소 너비 감싸기 (가로 스크롤 대비) -->
-      <div class="border rounded overflow-hidden" style="min-width: 800px">
-        <!-- 1. 그리드 헤더 영역 -->
-        <!-- 부트스트랩: bg-light(연회색), border-bottom(하단선), font-weight-bold(굵은글씨) -->
-        <div
-          class="d-flex bg-light border-bottom font-weight-bold text-center align-items-center"
-        >
-          <div
-            v-for="col in gridColumns"
-            :key="'header-' + col.key"
-            class="p-2 border-right text-nowrap"
-            :style="{ 
-          flex: col.flex || (col.width ? `0 0 ${col.width}` : '1 1 0%'), 
-          width: col.width, 
-          minWidth: col.minWidth, 
-          textAlign: col.align || 'center' 
-        }"
-            :title="col.label"
-          >
-            {{ col.label }}
-          </div>
-        </div>
+// 1. div[role="rowgroup"] 태그 아래의 모든 행(row)을 선택합니다.
+const rows = document.querySelectorAll('div[role="rowgroup"] div[role="row"]');
+const resultList = [];
 
-        <!-- 2. 그리드 본문(Body) 영역 -->
-        <div class="bg-white">
-          <!-- 가공된 평면 데이터 반복문 -->
-          <!-- 부트스트랩: border-bottom(하단선), align-items-center(수직중앙정렬) -->
-          <div
-            v-for="(row, rIdx) in gridData"
-            :key="'row-' + rIdx"
-            class="d-flex border-bottom align-items-center text-center"
-            style="transition: background-color 0.15s"
-            @mouseover="$el.querySelectorAll('.d-flex')[rIdx + 1].style.backgroundColor = '#f8f9fa'"
-            @mouseleave="$el.querySelectorAll('.d-flex')[rIdx + 1].style.backgroundColor = 'transparent'"
-          >
-            <div
-              v-for="col in gridColumns"
-              :key="'cell-' + rIdx + '-' + col.key"
-              class="p-2 border-right text-nowrap text-truncate"
-              :style="{ 
-            flex: col.flex || (col.width ? `0 0 ${col.width}` : '1 1 0%'), 
-            width: col.width, 
-            minWidth: col.minWidth, 
-            textAlign: col.align || 'center' 
-          }"
-            >
-              <!-- [열 종류별 커스텀 부트스트랩 요소 분기] -->
+rows.forEach((row) => {
+  // 행마다 데이터를 저장할 객체
+  let rowData = {
+    name: null,       // aria-colindex="2" (이름)
+    empId: null,      // aria-colindex="4" (사번)
+    role: null,       // aria-colindex="5" (역할)
+    lastLogin: null   // aria-colindex="6" (마지막 로그인)
+  };
 
-              <!-- ① 이동 열 -->
-              <template v-if="col.key === 'drag'">
-                <span style="cursor: grab; user-select: none">☰</span>
-              </template>
+  // --- 2번: 이름 (aria-colindex="2") ---
+  // 하위의 a 태그를 찾아 innerText 또는 텍스트 콘텐츠를 가져옵니다.
+  // (구조상 a 태그 내부에 이름이 텍스트로 들어가 있습니다)
+  const nameCell = row.querySelector('div[aria-colindex="2"]');
+  if (nameCell) {
+    const aTag = nameCell.querySelector('a');
+    if (aTag) {
+      rowData.name = aTag.innerText.trim();
+    }
+  }
 
-              <!-- ② 액션 열 -->
-              <!-- 부트스트랩: btn(버튼), btn-sm(소형), btn-outline-danger(빨간 테두리) -->
-              <template v-else-if="col.key === 'action'">
-                <button
-                  class="btn btn-sm btn-outline-danger py-0"
-                  @click="deleteItem(row)"
-                >
-                  삭제
-                </button>
-              </template>
+  // --- 4번: 사번 (aria-colindex="4") ---
+  // 최하위 span을 찾아 title 속성 값을 가져옵니다.
+  const empIdCell = row.querySelector('div[aria-colindex="4"]');
+  if (empIdCell) {
+    const spans = empIdCell.querySelectorAll('span');
+    if (spans.length > 0) {
+      const lastSpan = spans[spans.length - 1];
+      rowData.empId = lastSpan.getAttribute('title') || lastSpan.innerText.trim();
+    }
+  }
 
-              <!-- ③ 일반 데이터 열 -->
-              <template v-else> {{ row[col.key] }} </template>
-            </div>
-          </div>
+  // --- 5번: Role (aria-colindex="5") ---
+  // 최하위 span을 찾아 title 속성 값을 가져옵니다.
+  const roleCell = row.querySelector('div[aria-colindex="5"]');
+  if (roleCell) {
+    const spans = roleCell.querySelectorAll('span');
+    if (spans.length > 0) {
+      const lastSpan = spans[spans.length - 1];
+      rowData.role = lastSpan.getAttribute('title') || lastSpan.innerText.trim();
+    }
+  }
 
-          <!-- 데이터가 없을 때 예외 처리 -->
-          <!-- 부트스트랩: p-4(패딩), text-center(가운데정렬), text-muted(회색글씨) -->
-          <div v-if="gridData.length === 0" class="p-4 text-center text-muted">
-            조회된 정비 항목이 없습니다.
-          </div>
-        </div>
-      </div>
+  // --- 6번: 마지막 로그인 (aria-colindex="6") ---
+  // 최하위 span을 찾아 title이 아닌 span 태그 내부의 텍스트를 가져옵니다.
+  const loginCell = row.querySelector('div[aria-colindex="6"]');
+  if (loginCell) {
+    const spans = loginCell.querySelectorAll('span');
+    if (spans.length > 0) {
+      const lastSpan = spans[spans.length - 1];
+      rowData.lastLogin = lastSpan.innerText.trim();
+    }
+  }
 
-      <!--  -->
-      <!-- 부트스트랩 테두리 및 가로 스크롤 최소너비 방어 -->
-      <div class="border rounded overflow-hidden" style="min-width: 800px">
-        <!-- 1. 그리드 공통 헤더 영역 -->
-        <div
-          class="d-flex bg-secondary text-white font-weight-bold text-center align-items-center"
-        >
-          <div
-            v-for="col in gridColumns"
-            :key="'header-' + col.key"
-            class="p-2 border-right text-nowrap"
-            :style="{ 
-          flex: col.flex || (col.width ? `0 0 ${col.width}` : '1 1 0%'), 
-          width: col.width, 
-          minWidth: col.minWidth, 
-          textAlign: col.align || 'center' 
-        }"
-            :title="col.label"
-          >
-            {{ col.label }}
-          </div>
-        </div>
+  // 필요한 데이터가 하나라도 존재하는 행만 결과 리스트에 추가합니다.
+  if (rowData.name || rowData.empId || rowData.role || rowData.lastLogin) {
+    resultList.push(rowData);
+  }
+});
 
-        <!-- 2. 그리드 본문(Body) 영역 -->
-        <div class="bg-white">
-          <!-- [루프 1] 상위 카테고리 반복 -->
-          <template v-for="category in rawData">
-            <!-- 💡 A. 카테고리 단독 대제목 행 (Row) -->
-            <!-- 부트스트랩: bg-light(연회색), font-weight-bold(진하게), pl-3(왼쪽 여백) -->
-            <div
-              :key="'cat-row-' + category.code"
-              class="d-flex bg-light border-bottom align-items-center p-2 font-weight-bold text-dark text-left"
-            >
-              <!-- 전체를 한 칸으로 넓게 쓰기 위해 flex-fill 적용 -->
-              <div class="flex-fill pl-2">
-                <span class="badge badge-dark mr-2">📂 카테고리</span>
-                <strong>[{{ category.code }}] {{ category.name }}</strong>
-                <span class="text-muted small ml-3"
-                  >- {{ category.definition }}</span
-                >
-              </div>
-            </div>
-
-            <!-- 💡 B. [조건 추가] 하위 items가 비어있거나 없을 때 노출할 안내 행 -->
-            <!-- 부트스트랩: text-muted(회색글씨), py-3(상하 패딩으로 여백 확보) -->
-            <div
-              v-if="!category.items || category.items.length === 0"
-              :key="'empty-' + category.code"
-              class="d-flex border-bottom align-items-center justify-content-center text-muted py-3 bg-white"
-            >
-              <small>⚠️ 이 카테고리에 등록된 세부 정비항목이 없습니다.</small>
-            </div>
-
-            <!-- [루프 2] 해당 카테고리 내부의 하위 정비항목 행 (Row) 반복 -->
-            <template v-else>
-              <div
-                v-for="item in category.items"
-                :key="category.code + '-' + item.id"
-                class="d-flex border-bottom align-items-center text-center"
-              >
-                <div
-                  v-for="col in gridColumns"
-                  :key="category.code + '-' + item.id + '-' + col.key"
-                  class="p-2 border-right text-nowrap text-truncate"
-                  :style="{ 
-              flex: col.flex || (col.width ? `0 0 ${col.width}` : '1 1 0%'), 
-              width: col.width, 
-              minWidth: col.minWidth, 
-              textAlign: col.align || 'center'
-            }"
-                >
-                  <!-- ① 이동 열 -->
-                  <template v-if="col.key === 'drag'">
-                    <span style="cursor: grab; user-select: none">☰</span>
-                  </template>
-
-                  <!-- ② 카테고리 ID 열 (상위 category 객체에서 가져옴) -->
-                  <template v-else-if="col.key === 'catCode'">
-                    {{ category.code }}
-                  </template>
-
-                  <!-- ③ 카테고리명 열 (상위 category 객체에서 가져옴) -->
-                  <template v-else-if="col.key === 'catName'">
-                    {{ category.name }}
-                  </template>
-
-                  <!-- ④ 정비항목 ID 열 (하위 item 객체의 id) -->
-                  <template v-else-if="col.key === 'itemId'">
-                    {{ item.id }}
-                  </template>
-
-                  <!-- ⑤ 정비항목명 열 (하위 item 객체의 name) -->
-                  <template v-else-if="col.key === 'itemName'">
-                    {{ item.name }}
-                  </template>
-
-                  <!-- ⑥ 상세설명 열 (하위 item 객체의 description) -->
-                  <template v-else-if="col.key === 'description'">
-                    {{ item.description }}
-                  </template>
-
-                  <!-- ⑦ 작업구분 열 (하위 item 객체의 workType) -->
-                  <template v-else-if="col.key === 'workType'">
-                    {{ item.workType }}
-                  </template>
-
-                  <!-- ⑧ 액션 열 -->
-                  <template v-else-if="col.key === 'action'">
-                    <button
-                      class="btn btn-sm btn-outline-danger py-0"
-                      @click="deleteItem(category, item)"
-                    >
-                      삭제
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </template>
-          </template>
-
-          <!-- 데이터가 아예 없을 때 예외 처리 -->
-          <div v-if="rawData.length === 0" class="p-4 text-center text-muted">
-            조회된 카테고리 및 정비 항목이 없습니다.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap-vue@2.21.1/dist/bootstrap-vue.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vuedraggable@2.24.3/dist/vuedraggable.umd.min.js"></script>
-
-    <!-- 5. Vue 인스턴스 스크립트 -->
-    <script>
-      // HTML 문서 구조가 완전히 로드된 후 실행되도록 보장
-      document.addEventListener("DOMContentLoaded", function () {
-        new Vue({
-          el: "#app",
-          name: "BootstrapMaintenanceGrid",
-          data() {
-            return {
-              // 💡 부트스트랩의 flex 구조와 호환되도록 flex 및 너비 명세 최적화
-              gridColumns: [
-                { key: "drag", label: "이동", width: "60px", align: "center" },
-                {
-                  key: "catCode",
-                  label: "카테고리(ID)",
-                  flex: "1 1 0%",
-                  minWidth: "100px",
-                  align: "center",
-                },
-                {
-                  key: "catName",
-                  label: "카테고리명",
-                  flex: "1.5 1 0%",
-                  minWidth: "130px",
-                  align: "center",
-                },
-                {
-                  key: "itemId",
-                  label: "정비항목(ID)",
-                  flex: "1 1 0%",
-                  minWidth: "100px",
-                  align: "center",
-                },
-                {
-                  key: "itemName",
-                  label: "정비항목명",
-                  flex: "1.5 1 0%",
-                  minWidth: "150px",
-                  align: "center",
-                },
-                {
-                  key: "description",
-                  label: "상세설명",
-                  flex: "2.5 1 0%",
-                  minWidth: "200px",
-                  align: "left",
-                },
-                {
-                  key: "workType",
-                  label: "작업구분",
-                  width: "100px",
-                  align: "center",
-                },
-                {
-                  key: "action",
-                  label: "Action",
-                  width: "80px",
-                  align: "center",
-                },
-              ],
-              rawData: [
-                {
-                  code: "SP0000",
-                  name: "Supplies (소모품)",
-                  definition:
-                    "오일, 필터, 구리스, 부동액 등 주기적 교환/보충 자재",
-                  items: [
-                    {
-                      id: "SP0001",
-                      name: "엔진오일 교환",
-                      description: "주기적 오일 교환",
-                      workType: "WT_01",
-                    },
-                    {
-                      id: "SP0002",
-                      name: "엔진오일 보충",
-                      description: "부족분 상시 보충",
-                      workType: "WT_02",
-                    },
-                  ],
-                },
-                {
-                  code: "WH0000",
-                  name: "Wheel (타이어)",
-                  definition: "타이어, 휠 관련 작업 전체",
-                  items: [
-                    {
-                      id: "WH0001",
-                      name: "앞 타이어 교체",
-                      description: "전륜 신품 교환",
-                      workType: "WT_01",
-                    },
-                    {
-                      id: "WH0002",
-                      name: "타이어 펑크 수리",
-                      description: "패치 및 지렁이",
-                      workType: "WT_03",
-                    },
-                  ],
-                },
-                {
-                  code: "IP0000",
-                  name: "Inspection (일반점검)",
-                  definition: "육안 검사, 정기 점검 등 (수리/부품값 미발생)",
-                  expanded: true,
-                  items: [],
-                },
-                {
-                  code: "ME0000",
-                  name: "Mechanical (기계/동력)",
-                  definition:
-                    "엔진, 미션, 라디에이터, 조향축 등 동력전달 핵심 장치",
-                  expanded: false,
-                  items: [],
-                },
-              ],
-            };
-          },
-          computed: {
-            gridData() {
-              const flatList = [];
-              this.rawData.forEach((category) => {
-                if (category.items && category.items.length > 0) {
-                  category.items.forEach((item) => {
-                    flatList.push({
-                      catCode: category.code,
-                      catName: category.name,
-                      itemId: item.id,
-                      itemName: item.name,
-                      description: item.description,
-                      workType: item.workType,
-                      originCategoryCode: category.code,
-                      originItemId: item.id,
-                    });
-                  });
-                }
-              });
-              return flatList;
-            },
-          },
-          methods: {
-            deleteItem(row) {
-              if (confirm(`[${row.itemName}] 항목을 삭제하시겠습니까?`)) {
-                const category = this.rawData.find(
-                  (cat) => cat.code === row.originCategoryCode,
-                );
-                if (category) {
-                  category.items = category.items.filter(
-                    (item) => item.id !== row.originItemId,
-                  );
-                }
-              }
-            },
-          },
-        });
-      });
-    </script>
-  </body>
-</html>
+// 결과를 테이블 형태로 콘솔에 깔끔하게 출력합니다.
+console.table(resultList);
